@@ -66,7 +66,6 @@ Make the changes. Apply these in order:
 | ------------- | -------------------------------------------------- | ------------------------------------------------- |
 | Extension     | See `packages/danmaku-anywhere/AGENTS.md`          | **Open dev browser** at start of work (see below) |
 | Web app       | See `app/web/AGENTS.md`                            | **CF preview URL** from PR deploy comment         |
-| Backend       | See `backend/proxy/AGENTS.md`                      | N/A                                               |
 | Packages      | `pnpm --filter <package> test`                     | N/A                                               |
 | Cross-cutting | `pnpm lint && pnpm --filter '...[origin/master]' test` | Depends on areas touched                          |
 

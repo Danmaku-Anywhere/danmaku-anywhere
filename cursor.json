@@ -92,7 +92,6 @@
       "packages/web-scraper",
       "packages/shared-ui",
       "app/web",
-      "backend/proxy",
       "docs"
     ]
   },

@@ -8,7 +8,7 @@ Danmaku Anywhere is an open-source project for overlaying danmaku (bullet commen
 
 - **Browser extension** (`packages/danmaku-anywhere/`) — Chrome/Firefox extension that injects danmaku onto video pages (Plex, Jellyfin, YouTube, etc.)
 - **Web app** (`app/web/`) — Angular SPA for video discovery/playback using Kazumi rules, requires the extension
-- **Backend** (`backend/proxy/`) — Cloudflare Workers API (Hono) for proxying, auth, and LLM features
+- **Backend**: Cloudflare Workers API (Hono) for proxying, auth, and LLM features. It lives in `Danmaku-Anywhere/backend` and installs `integration-policy` from npm.
 - **Shared packages** — TypeScript libraries used across the above
 
 ## Monorepo structure
@@ -25,8 +25,6 @@ packages/
   integration-policy/   # Schema for site/feature integration policies
 app/
   web/                  # Angular web app
-backend/
-  proxy/                # Cloudflare Workers backend
 architecture/           # Design notes for the extension
 ```
 
@@ -43,7 +41,6 @@ architecture/           # Design notes for the extension
 | Format | `pnpm format` |
 | Dev extension | `cd packages/danmaku-anywhere && pnpm dev` |
 | Dev web app | `cd app/web && pnpm start` |
-| Dev backend | `cd backend/proxy && pnpm dev` |
 | Extract i18n keys | `cd packages/danmaku-anywhere && pnpm i18n extract` |
 
 Always prefer scripts defined in `package.json` over ad-hoc commands. Run `pnpm type-check` instead of `tsc`/`tsgo`, `pnpm lint` instead of `biome check`, etc. When you need to run a CLI tool not available as a script, use `pnpx` (never `npx`).
@@ -53,7 +50,7 @@ Always prefer scripts defined in `package.json` over ad-hoc commands. Run `pnpm 
 - **Run affected tests only**: `pnpm --filter '...[origin/master]' test` to test only packages changed since master
 - **Single package**: `pnpm --filter <package> test`
 - **All tests**: `pnpm test` at root
-- Packages and backend use Vitest. The web app uses Jasmine+Karma (`pnpm test:ng` in `app/web/`).
+- Packages use Vitest. The web app uses Jasmine+Karma (`pnpm test:ng` in `app/web/`).
 - Always run `pnpm type-check` and `pnpm lint` — these are fast and catch most issues.
 - **Never run the extension's full e2e suite locally.** `pnpm test:e2e` is CI's job. Locally run the
   affected spec(s), and at most `pnpm test:e2e:smoke`. `pnpm test:e2e:changed` follows direct
