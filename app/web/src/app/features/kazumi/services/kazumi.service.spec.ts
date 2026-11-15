@@ -4,9 +4,9 @@ import {
   zKazumiPolicy,
 } from '@danmaku-anywhere/extension-protocol'
 import {
+  injectQuery,
   provideQueryClient,
   QueryClient,
-  QueryObserver,
 } from '@tanstack/angular-query-experimental'
 import { defer, finalize, from, type Observable, throwError } from 'rxjs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -19,6 +19,11 @@ import { KazumiService } from './kazumi.service'
  * scraper cannot run (api mode) must be refused with a reason the settings
  * panel can show next to that rule, and the reason must not bleed into
  * other rules or survive a retry of the same rule.
+ *
+ * Searching opens a browser window per rule, so by default only the rule tab
+ * the user opens is searched. The "search all rules" switch searches every
+ * runnable rule through a shared three-slot cap, and a keyword change drops
+ * the searches still waiting for the old keyword.
  */
 
 const apiRule = {
@@ -153,6 +158,10 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
+function gateKey(payload: SearchPayload) {
+  return `${payload.policy.name}:${payload.keyword}`
+}
+
 describe('KazumiService rule search', () => {
   let service: KazumiService
   let queryClient: QueryClient
@@ -177,7 +186,7 @@ describe('KazumiService rule search', () => {
       active++
       peak = Math.max(peak, active)
       const gate = deferred<unknown[]>()
-      gates.set(payload.policy.name, gate)
+      gates.set(gateKey(payload), gate)
       return from(gate.promise).pipe(
         finalize(() => {
           active--
@@ -186,11 +195,31 @@ describe('KazumiService rule search', () => {
     })
   }
 
-  beforeEach(() => {
-    active = 0
-    peak = 0
-    searchCalls.length = 0
-    gates.clear()
+  function searched() {
+    return searchCalls.map(gateKey)
+  }
+
+  function finish(key: string) {
+    const gate = gates.get(key)
+    if (!gate) {
+      throw new Error(`no search in flight for ${key}`)
+    }
+    gate.resolve([])
+  }
+
+  // The tab badge and the result panel both observe the search through
+  // injectQuery, so the test subscribes the same way the components do.
+  function observeAllRules() {
+    return TestBed.runInInjectionContext(() =>
+      allRules.map((policy) =>
+        injectQuery(() =>
+          service.getSearchQueryOptions(service.$searchQuery(), policy)
+        )
+      )
+    )
+  }
+
+  function configureTestBed() {
     queryClient = new QueryClient({
       defaultOptions: {
         queries: {
@@ -210,100 +239,146 @@ describe('KazumiService rule search', () => {
       ],
     })
     service = TestBed.inject(KazumiService)
+  }
+
+  beforeEach(() => {
+    localStorage.clear()
+    active = 0
+    peak = 0
+    searchCalls.length = 0
+    gates.clear()
+    configureTestBed()
   })
 
   afterEach(() => {
     TestBed.resetTestingModule()
   })
 
-  it('searches every runnable rule through the shared cap as the query changes', async () => {
+  it('is off until the user turns it on, and remembers the choice', () => {
+    expect(service.$searchAllRules()).toBe(false)
+
+    service.setSearchAllRules(true)
+
+    TestBed.resetTestingModule()
+    configureTestBed()
+    expect(service.$searchAllRules()).toBe(true)
+  })
+
+  it('searches only the rule tabs the user opens while the switch is off', async () => {
+    observeAllRules()
+
+    service.updateQuery('frieren')
+    TestBed.tick()
+
+    await vi.waitFor(() => {
+      expect(searched()).toEqual(['rule1:frieren'])
+    })
+    finish('rule1:frieren')
+    await vi.waitFor(() => {
+      expect(active).toBe(0)
+    })
+
+    service.setActivePolicy(xpathRules[2])
+    TestBed.tick()
+    await vi.waitFor(() => {
+      expect(searched()).toEqual(['rule1:frieren', 'rule3:frieren'])
+    })
+    finish('rule3:frieren')
+    await vi.waitFor(() => {
+      expect(active).toBe(0)
+    })
+
+    service.setActivePolicy(xpathRules[0])
+    TestBed.tick()
+    await Promise.resolve()
+    expect(searched()).toEqual(['rule1:frieren', 'rule3:frieren'])
+    expect(peak).toBe(1)
+  })
+
+  it('searches every runnable rule at most three at a time while the switch is on', async () => {
+    service.setSearchAllRules(true)
+    observeAllRules()
+
     service.updateQuery('  frieren  ')
     TestBed.tick()
 
     await vi.waitFor(() => {
       expect(gates.size).toBe(3)
     })
-    expect(searchCalls.map((call) => call.policy.name)).toEqual([
-      'rule1',
-      'rule2',
-      'rule3',
-    ])
-    expect(searchCalls.map((call) => call.keyword)).toEqual([
-      'frieren',
-      'frieren',
-      'frieren',
+    expect(searched()).toEqual([
+      'rule1:frieren',
+      'rule2:frieren',
+      'rule3:frieren',
     ])
     expect(peak).toBe(3)
 
-    gates.get('rule1')?.resolve([])
-    gates.get('rule2')?.resolve([])
-    gates.get('rule3')?.resolve([])
-
+    finish('rule1:frieren')
+    finish('rule2:frieren')
+    finish('rule3:frieren')
     await vi.waitFor(() => {
       expect(gates.size).toBe(5)
     })
     expect(peak).toBe(3)
 
-    gates.get('rule4')?.resolve([])
-    gates.get('rule5')?.resolve([])
-
+    finish('rule4:frieren')
+    finish('rule5:frieren')
     await vi.waitFor(() => {
       expect(active).toBe(0)
     })
-    expect(searchCalls.map((call) => call.policy.name)).toEqual([
-      'rule1',
-      'rule2',
-      'rule3',
-      'rule4',
-      'rule5',
+    expect(searched()).toEqual([
+      'rule1:frieren',
+      'rule2:frieren',
+      'rule3:frieren',
+      'rule4:frieren',
+      'rule5:frieren',
     ])
-    expect(searchCalls.map((call) => call.policy.name)).not.toContain(
-      parsedApiRule.name
-    )
   })
 
-  it('keeps the shared cap when components subscribe their own queries', async () => {
-    const observers = allRules.map((policy) => {
-      return new QueryObserver(
-        queryClient,
-        service.getSearchQueryOptions('frieren', policy)
-      )
-    })
-    const unsubscribes = observers.map((observer) => {
-      return observer.subscribe(() => undefined)
-    })
+  it('drops the searches still waiting for the old keyword when it changes', async () => {
+    service.setSearchAllRules(true)
+    observeAllRules()
 
+    service.updateQuery('frieren')
+    TestBed.tick()
     await vi.waitFor(() => {
       expect(gates.size).toBe(3)
     })
-    expect(peak).toBe(3)
-    expect(searchCalls.map((call) => call.policy.name)).not.toContain(
-      parsedApiRule.name
-    )
 
-    for (const call of searchCalls) {
-      gates.get(call.policy.name)?.resolve([])
-    }
+    service.updateQuery('mushoku')
+    TestBed.tick()
+
+    finish('rule1:frieren')
+    finish('rule2:frieren')
+    finish('rule3:frieren')
     await vi.waitFor(() => {
-      expect(gates.size).toBe(5)
+      expect(gates.size).toBe(6)
     })
-    for (const call of [...searchCalls]) {
-      gates.get(call.policy.name)?.resolve([])
-    }
+    expect(searched()).not.toContain('rule4:frieren')
+    expect(searched()).not.toContain('rule5:frieren')
+    expect(searched().slice(3)).toEqual([
+      'rule1:mushoku',
+      'rule2:mushoku',
+      'rule3:mushoku',
+    ])
+    expect(peak).toBe(3)
+
+    finish('rule1:mushoku')
+    finish('rule2:mushoku')
+    finish('rule3:mushoku')
+    await vi.waitFor(() => {
+      expect(gates.size).toBe(8)
+    })
+    finish('rule4:mushoku')
+    finish('rule5:mushoku')
     await vi.waitFor(() => {
       expect(active).toBe(0)
     })
-    expect(searchCalls.map((call) => call.policy.name)).toEqual([
-      'rule1',
-      'rule2',
-      'rule3',
-      'rule4',
-      'rule5',
+    expect(searched().filter((key) => key.endsWith(':frieren'))).toEqual([
+      'rule1:frieren',
+      'rule2:frieren',
+      'rule3:frieren',
     ])
-
-    for (const unsubscribe of unsubscribes) {
-      unsubscribe()
-    }
+    expect(peak).toBe(3)
   })
 
   it('uses the normalized keyword for the cache key and the search', () => {
@@ -314,19 +389,20 @@ describe('KazumiService rule search', () => {
     )
   })
 
-  it('searches an xpath rule once there is a keyword', () => {
+  it('never searches a rule the scraper cannot run', () => {
+    service.setSearchAllRules(true)
+
     expect(
       service.getSearchQueryOptions('frieren', xpathRules[0]).enabled
     ).toBe(true)
-  })
-
-  it('never searches a rule the scraper cannot run', () => {
     expect(
       service.getSearchQueryOptions('frieren', parsedApiRule).enabled
     ).toBe(false)
   })
 
   it('waits for a keyword', () => {
+    service.setSearchAllRules(true)
+
     expect(service.getSearchQueryOptions('   ', xpathRules[0]).enabled).toBe(
       false
     )

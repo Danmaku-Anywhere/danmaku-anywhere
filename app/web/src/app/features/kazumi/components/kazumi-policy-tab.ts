@@ -23,7 +23,7 @@ import { KazumiService } from '../services/kazumi.service'
         'bg-yellow-600': searchQuery.isFetching(),
         'bg-green-600': searchQuery.isSuccess(),
         'bg-red-600': searchQuery.isError(),
-        'bg-gray-600': !keyword()
+        'bg-gray-600': !searchQuery.isEnabled()
         }"
       ></p-badge>
     </div>

@@ -50,6 +50,19 @@ const POLICY_ORDER_KEY = 'policyOrder'
 // to.
 const SEARCH_CONCURRENCY = 3
 
+const SEARCH_ALL_RULES_STORAGE_KEY = 'da-kazumi-search-all-rules'
+
+function readSearchAllRules(): boolean {
+  if (typeof localStorage === 'undefined') {
+    return false
+  }
+  try {
+    return localStorage.getItem(SEARCH_ALL_RULES_STORAGE_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
 class KazumiDb extends Dexie {
   policies!: Table<KazumiPolicy, string>
   settings!: Table<Setting<unknown>, string>
@@ -101,6 +114,10 @@ export class KazumiService {
   private readonly $_searchQuery = signal('')
   readonly $searchQuery = this.$_searchQuery.asReadonly()
 
+  // whether a search runs every rule, or only the rule tabs the user opens
+  private readonly $_searchAllRules = signal(readSearchAllRules())
+  readonly $searchAllRules = this.$_searchAllRules.asReadonly()
+
   // for policy imports
   private readonly $_inProgressImports = signal(new Set<string>())
   readonly $inProgressImports = this.$_inProgressImports.asReadonly()
@@ -108,6 +125,10 @@ export class KazumiService {
   // why the last import of each policy failed, keyed by policy name
   private readonly $_importErrors = signal(new Map<string, string>())
   readonly $importErrors = this.$_importErrors.asReadonly()
+
+  // rule tabs the user opened for the current query, searched even when the
+  // search-all switch is off
+  private readonly $_visitedTabs = signal(new Map<string, boolean>())
 
   // the search result to load episodes for
   private readonly $_mediaSearchDetails = signal<MediaSearchDetails | null>(
@@ -308,46 +329,42 @@ export class KazumiService {
       }
     })
 
-    // search every rule the scraper can run as soon as the query changes
+    // update visitedTabs when _activePolicy changes
     effect(() => {
-      const keyword = this.$_searchQuery().trim()
-      const policies = this.localPoliciesQuery.data()
-      if (!keyword || !policies?.length) {
-        return
-      }
-      const searchable = policies.filter(isXPathPolicy)
-      void Promise.allSettled(
-        searchable.map((policy) =>
-          this.queryClient.prefetchQuery(
-            this.searchQueryOptions(keyword, policy)
-          )
-        )
-      )
+      const activePolicy = this.$_activePolicy()
+      // skip if there is no query
+      if (!activePolicy || !this.$_searchQuery()) return
+      this.$_visitedTabs.update((m) => new Map(m).set(activePolicy.name, true))
     })
   }
 
-  private searchQueryOptions(keyword: string, policy: KazumiPolicy) {
-    const trimmedKeyword = keyword.trim()
-    return {
-      queryKey: queryKeys.kazumi.search(policy.name, trimmedKeyword),
-      queryFn: async () => {
-        return this.searchSlots(() =>
-          lastValueFrom(
-            this.extensionMessagingService.single('kazumiSearch', {
-              keyword: trimmedKeyword,
-              policy,
-            })
-          )
-        )
-      },
-      staleTime: Number.POSITIVE_INFINITY,
-    }
+  isRuleSearched(name: string): boolean {
+    return this.$_searchAllRules() || (this.$_visitedTabs().get(name) ?? false)
   }
 
   getSearchQueryOptions(keyword: string, policy: KazumiPolicy) {
+    const trimmedKeyword = keyword.trim()
     return queryOptions({
-      ...this.searchQueryOptions(keyword, policy),
-      enabled: !!keyword.trim() && isXPathPolicy(policy),
+      // TanStack aborts the signal once no component observes the query any
+      // more, which is how a search queued for a stale keyword is dropped.
+      queryFn: ({ signal }) => {
+        return this.searchSlots(
+          () =>
+            lastValueFrom(
+              this.extensionMessagingService.single('kazumiSearch', {
+                keyword: trimmedKeyword,
+                policy,
+              })
+            ),
+          signal
+        )
+      },
+      queryKey: queryKeys.kazumi.search(policy.name, trimmedKeyword),
+      enabled:
+        !!trimmedKeyword &&
+        isXPathPolicy(policy) &&
+        this.isRuleSearched(policy.name),
+      staleTime: Number.POSITIVE_INFINITY,
     })
   }
 
@@ -425,5 +442,17 @@ export class KazumiService {
 
   updateQuery(query: string) {
     this.$_searchQuery.set(query)
+  }
+
+  setSearchAllRules(enabled: boolean) {
+    this.$_searchAllRules.set(enabled)
+    if (typeof localStorage === 'undefined') {
+      return
+    }
+    try {
+      localStorage.setItem(SEARCH_ALL_RULES_STORAGE_KEY, String(enabled))
+    } catch {
+      // localStorage throws in private browsing, the signal still holds the value
+    }
   }
 }
