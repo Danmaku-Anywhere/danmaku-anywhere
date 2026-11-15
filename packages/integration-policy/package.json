@@ -1,14 +1,34 @@
 {
   "name": "@danmaku-anywhere/integration-policy",
   "version": "0.1.0",
-  "private": true,
-  "description": "Integration policy",
+  "description": "Schema, serialization and migrations for Danmaku Anywhere integration policies",
   "author": "Mr-Quin",
-  "repository": "https://github.com/Danmaku-Anywhere/danmaku-anywhere",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Danmaku-Anywhere/danmaku-anywhere",
+    "directory": "packages/integration-policy"
+  },
   "license": "MIT",
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
+  "files": [
+    "dist",
+    "!dist/tsconfig.tsbuildinfo"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public",
+    "provenance": true,
+    "main": "dist/src/index.js",
+    "types": "dist/src/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/src/index.d.ts",
+        "default": "./dist/src/index.js"
+      }
+    }
+  },
   "scripts": {
     "build": "tsgo",
     "lint": "biome check --fix",
