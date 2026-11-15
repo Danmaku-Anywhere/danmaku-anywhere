@@ -28,11 +28,11 @@ import { preferredThumbnail } from '../utils/subject-images'
         <div class="grid grid-cols-2 gap-4">
           @for (staffMember of response.data; track staffMember.staff.id) {
             <div class="flex gap-4">
-              @if (preferredThumbnail(staffMember.staff.images); as src) {
+              @if (preferredThumbnail(staffMember.staff.images, 96); as src) {
                 <da-image
                   [src]="src"
-                  [width]="64"
-                  [height]="64"
+                  [width]="96"
+                  [height]="96"
                   [alt]="staffMember.staff.name"
                   styleClass="w-24 h-24 object-cover rounded"
                 />

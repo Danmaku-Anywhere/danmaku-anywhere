@@ -10,6 +10,7 @@ import {
 import { Tag } from 'primeng/tag'
 import { DaImage } from '../../../shared/components/da-image'
 import type { LegacyBgmSubject } from '../../bangumi/types/bangumi.types'
+import { preferredThumbnail } from '../../bangumi/utils/subject-images'
 import { SearchListItem } from '../search-list-item.component'
 
 @Component({
@@ -78,8 +79,7 @@ export class BangumiSearchResultListItem {
   onSelect = output<void>()
 
   $imageSrc = computed(() => {
-    const item = this.subject()
-    return item.images?.grid ?? item.images?.medium ?? item.images?.large ?? ''
+    return preferredThumbnail(this.subject().images, 64)
   })
 
   $primaryName = computed(() => {

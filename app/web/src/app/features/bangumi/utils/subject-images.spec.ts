@@ -5,10 +5,11 @@ import {
 } from './subject-images'
 
 /**
- * Each surface asks for the smallest Bangumi variant that still looks sharp
- * at the size it renders: posters keep the largest cover, cards take the
- * 400px one, thumbnails take the grid crop. These helpers also keep a missing
- * image set from producing a broken URL.
+ * Posters keep the largest cover and cards take the 400px one. Thumbnails
+ * pick by the width encoded in the URL, because the v0 and next Bangumi APIs
+ * hand out different widths under the same variant names: a slot gets the
+ * smallest variant that is at least twice its CSS width, else the largest
+ * one available. A missing image set never produces a broken URL.
  */
 
 const images = {
@@ -17,6 +18,29 @@ const images = {
   medium: 'https://lain.bgm.tv/medium.jpg',
   small: 'https://lain.bgm.tv/small.jpg',
   grid: 'https://lain.bgm.tv/grid.jpg',
+}
+
+const nextSubject = {
+  large: 'https://lain.bgm.tv/pic/cover/l/cover.jpg',
+  common: 'https://lain.bgm.tv/r/400/pic/cover/l/cover.jpg',
+  medium: 'https://lain.bgm.tv/r/200/pic/cover/l/cover.jpg',
+  small: 'https://lain.bgm.tv/r/100/pic/cover/l/cover.jpg',
+  grid: 'https://lain.bgm.tv/r/100x100/pic/cover/l/cover.jpg',
+}
+
+const nextPerson = {
+  large: 'https://lain.bgm.tv/pic/crt/l/person.jpg?r=1',
+  medium: 'https://lain.bgm.tv/r/200/pic/crt/l/person.jpg?r=1',
+  small: 'https://lain.bgm.tv/r/100/pic/crt/l/person.jpg?r=1',
+  grid: 'https://lain.bgm.tv/r/100x100/pic/crt/l/person.jpg?r=1',
+}
+
+const v0Subject = {
+  large: 'https://lain.bgm.tv/pic/cover/l/cover.jpg',
+  common: 'https://lain.bgm.tv/r/400/pic/cover/l/cover.jpg',
+  medium: 'https://lain.bgm.tv/r/800/pic/cover/l/cover.jpg',
+  small: 'https://lain.bgm.tv/r/200/pic/cover/l/cover.jpg',
+  grid: 'https://lain.bgm.tv/r/100/pic/cover/l/cover.jpg',
 }
 
 describe('subject image variants', () => {
@@ -28,13 +52,8 @@ describe('subject image variants', () => {
     expect(preferredCover(images)).toBe('https://lain.bgm.tv/common.jpg')
   })
 
-  it('prefers the grid thumbnail for small images', () => {
-    expect(preferredThumbnail(images)).toBe('https://lain.bgm.tv/grid.jpg')
-  })
-
-  it('falls back to a larger variant when smaller ones are missing', () => {
+  it('falls back to a larger cover when the 400px one is missing', () => {
     expect(preferredCover({ large: images.large })).toBe(images.large)
-    expect(preferredThumbnail({ medium: images.medium })).toBe(images.medium)
   })
 
   it('falls back to a smaller variant when the poster cover is missing', () => {
@@ -47,6 +66,54 @@ describe('subject image variants', () => {
     expect(preferredPoster(null)).toBe('')
     expect(preferredCover(undefined)).toBe('')
     expect(preferredCover(null)).toBe('')
-    expect(preferredThumbnail(undefined)).toBe('')
+  })
+})
+
+describe('preferredThumbnail', () => {
+  it('picks the 200px next API cover for an 80px slot', () => {
+    expect(preferredThumbnail(nextSubject, 80)).toBe(nextSubject.medium)
+  })
+
+  it('picks the 200px v0 cover for a 64px slot', () => {
+    expect(preferredThumbnail(v0Subject, 64)).toBe(v0Subject.small)
+  })
+
+  it('picks the 200px portrait for 64px and 96px slots', () => {
+    expect(preferredThumbnail(nextPerson, 64)).toBe(nextPerson.medium)
+    expect(preferredThumbnail(nextPerson, 96)).toBe(nextPerson.medium)
+  })
+
+  it('steps up to the 400px cover for a wider slot', () => {
+    expect(preferredThumbnail(nextSubject, 150)).toBe(nextSubject.common)
+  })
+
+  it('takes the original when no resized variant is wide enough', () => {
+    expect(preferredThumbnail(nextSubject, 300)).toBe(nextSubject.large)
+  })
+
+  it('takes the largest variant available when none reaches twice the slot', () => {
+    expect(
+      preferredThumbnail(
+        { small: nextSubject.small, grid: nextSubject.grid },
+        80
+      )
+    ).toBe(nextSubject.small)
+  })
+
+  it('treats a URL without a size segment as the original', () => {
+    expect(preferredThumbnail({ grid: 'https://example.com/a.jpg' }, 80)).toBe(
+      'https://example.com/a.jpg'
+    )
+  })
+
+  it('returns an empty string for a missing image set', () => {
+    expect(preferredThumbnail(undefined, 80)).toBe('')
+    expect(preferredThumbnail(null, 80)).toBe('')
+  })
+
+  it('returns an empty string when a person has no photo', () => {
+    expect(
+      preferredThumbnail({ large: '', medium: '', small: '', grid: '' }, 96)
+    ).toBe('')
   })
 })

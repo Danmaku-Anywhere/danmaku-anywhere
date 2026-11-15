@@ -31,4 +31,5 @@ Angular SPA for video discovery and playback using Kazumi rules. Requires the Da
 
 - Requires the browser extension to be installed for scraping features
 - Uses Vitest + jsdom via the `@angular/build:unit-test` builder (`pnpm test:ng`). Specs import from `vitest`, not Jasmine
+- Bangumi image variants mean different widths per API. The next API (`/p1`, used by details tabs and trending) returns `small` 100px, `medium` 200px, `common` 400px, `grid` a 100x100 crop; the v0 API (search) returns `grid` 100px, `small` 200px, `common` 400px, `medium` 800px. Pick thumbnails with `preferredThumbnail(images, slotWidth)` in `features/bangumi/utils/subject-images.ts`, which reads the width from the URL, instead of by variant name
 - See `package.json` for available scripts and dependencies

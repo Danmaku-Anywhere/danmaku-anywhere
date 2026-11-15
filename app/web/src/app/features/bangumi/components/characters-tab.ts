@@ -29,7 +29,7 @@ import { preferredThumbnail } from '../utils/subject-images'
           @for (character of response.data; track character.character.id) {
             <div class="flex gap-4">
               <da-image
-                [src]="preferredThumbnail(character.character.images)"
+                [src]="preferredThumbnail(character.character.images, 64)"
                 [alt]="character.character.name"
                 styleClass="w-16 h-16 object-cover rounded"
               />

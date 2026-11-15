@@ -35,7 +35,7 @@ import { HorizontalCardSkeletonGrid } from './horizontal-card-skeleton-grid'
           @for (relation of response.data; track relation.subject.id) {
             <div class="flex gap-4">
               <da-image
-                [src]="preferredThumbnail(relation.subject.images)"
+                [src]="preferredThumbnail(relation.subject.images, 80)"
                 [alt]="relation.subject.name"
                 styleClass="w-20 h-28 object-cover rounded"
               />

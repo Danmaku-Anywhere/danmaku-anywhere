@@ -33,7 +33,7 @@ import { HorizontalCardSkeletonGrid } from './horizontal-card-skeleton-grid'
           @for (recommendation of response.data; track recommendation.subject.id) {
             <div class="flex gap-4">
               <da-image
-                [src]="preferredThumbnail(recommendation.subject.images)"
+                [src]="preferredThumbnail(recommendation.subject.images, 80)"
                 [alt]="recommendation.subject.name"
                 styleClass="w-20 h-28 object-cover rounded"
               />
