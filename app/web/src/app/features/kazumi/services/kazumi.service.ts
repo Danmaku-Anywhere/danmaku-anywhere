@@ -3,6 +3,7 @@ import {
   effect,
   Injectable,
   inject,
+  linkedSignal,
   signal,
   untracked,
 } from '@angular/core'
@@ -36,6 +37,7 @@ import { sortArrayByOrder } from '../../../shared/utils/utils'
 import { withTimeout } from '../../../shared/utils/withTimeout'
 import { normalizeStoredPolicy } from '../utils/normalize-stored-policy'
 import { getManifest, getPolicy } from './kazumi-api'
+import { KazumiSearchPreferences } from './kazumi-search-preferences'
 
 interface Setting<T> {
   key: string
@@ -49,19 +51,6 @@ const POLICY_ORDER_KEY = 'policyOrder'
 // share one slot pool no matter who starts them or which keyword they belong
 // to.
 const SEARCH_CONCURRENCY = 3
-
-const SEARCH_ALL_RULES_STORAGE_KEY = 'da-kazumi-search-all-rules'
-
-function readSearchAllRules(): boolean {
-  if (typeof localStorage === 'undefined') {
-    return false
-  }
-  try {
-    return localStorage.getItem(SEARCH_ALL_RULES_STORAGE_KEY) === 'true'
-  } catch {
-    return false
-  }
-}
 
 class KazumiDb extends Dexie {
   policies!: Table<KazumiPolicy, string>
@@ -104,6 +93,7 @@ export class KazumiService {
   private readonly db = new KazumiDb()
   private readonly extensionMessagingService = inject(ExtensionMessagingService)
   private readonly queryClient = inject(QueryClient)
+  private readonly searchPreferences = inject(KazumiSearchPreferences)
   private readonly searchSlots = createLimiter(SEARCH_CONCURRENCY)
 
   // active policy for tab
@@ -114,10 +104,6 @@ export class KazumiService {
   private readonly $_searchQuery = signal('')
   readonly $searchQuery = this.$_searchQuery.asReadonly()
 
-  // whether a search runs every rule, or only the rule tabs the user opens
-  private readonly $_searchAllRules = signal(readSearchAllRules())
-  readonly $searchAllRules = this.$_searchAllRules.asReadonly()
-
   // for policy imports
   private readonly $_inProgressImports = signal(new Set<string>())
   readonly $inProgressImports = this.$_inProgressImports.asReadonly()
@@ -126,9 +112,12 @@ export class KazumiService {
   private readonly $_importErrors = signal(new Map<string, string>())
   readonly $importErrors = this.$_importErrors.asReadonly()
 
-  // rule tabs the user opened for the current query, searched even when the
-  // search-all switch is off
-  private readonly $_visitedTabs = signal(new Map<string, boolean>())
+  // Rule tabs the user opened for the current keyword, searched even when the
+  // search-all switch is off. A new keyword starts over with the active tab.
+  private readonly $_visitedTabs = linkedSignal<string, Set<string>>({
+    source: this.$_searchQuery,
+    computation: () => new Set<string>(),
+  })
 
   // the search result to load episodes for
   private readonly $_mediaSearchDetails = signal<MediaSearchDetails | null>(
@@ -334,20 +323,24 @@ export class KazumiService {
       const activePolicy = this.$_activePolicy()
       // skip if there is no query
       if (!activePolicy || !this.$_searchQuery()) return
-      this.$_visitedTabs.update((m) => new Map(m).set(activePolicy.name, true))
+      this.$_visitedTabs.update((tabs) => new Set(tabs).add(activePolicy.name))
     })
   }
 
   isRuleSearched(name: string): boolean {
-    return this.$_searchAllRules() || (this.$_visitedTabs().get(name) ?? false)
+    return (
+      this.searchPreferences.$searchAllRules() || this.$_visitedTabs().has(name)
+    )
   }
 
   getSearchQueryOptions(keyword: string, policy: KazumiPolicy) {
     const trimmedKeyword = keyword.trim()
     return queryOptions({
-      // TanStack aborts the signal once no component observes the query any
-      // more, which is how a search queued for a stale keyword is dropped.
-      queryFn: ({ signal }) => {
+      // The queryFn must not read TanStack's abort signal: that would make
+      // TanStack cancel the search, extension window and all, as soon as the
+      // user leaves the page. Searches the user has moved on from are skipped
+      // by the limiter instead, when their turn comes.
+      queryFn: () => {
         return this.searchSlots(
           () =>
             lastValueFrom(
@@ -356,7 +349,10 @@ export class KazumiService {
                 policy,
               })
             ),
-          signal
+          {
+            isStale: () => this.$_searchQuery().trim() !== trimmedKeyword,
+            isUrgent: () => this.$_activePolicy()?.name === policy.name,
+          }
         )
       },
       queryKey: queryKeys.kazumi.search(policy.name, trimmedKeyword),
@@ -442,17 +438,5 @@ export class KazumiService {
 
   updateQuery(query: string) {
     this.$_searchQuery.set(query)
-  }
-
-  setSearchAllRules(enabled: boolean) {
-    this.$_searchAllRules.set(enabled)
-    if (typeof localStorage === 'undefined') {
-      return
-    }
-    try {
-      localStorage.setItem(SEARCH_ALL_RULES_STORAGE_KEY, String(enabled))
-    } catch {
-      // localStorage throws in private browsing, the signal still holds the value
-    }
   }
 }

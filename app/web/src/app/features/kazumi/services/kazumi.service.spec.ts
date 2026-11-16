@@ -1,3 +1,8 @@
+import {
+  createEnvironmentInjector,
+  EnvironmentInjector,
+  runInInjectionContext,
+} from '@angular/core'
 import { TestBed } from '@angular/core/testing'
 import {
   type KazumiPolicy,
@@ -13,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ExtensionMessagingService } from '../../../core/extension/extension-messaging.service'
 import { queryKeys } from '../../../shared/query/queryKeys'
 import { KazumiService } from './kazumi.service'
+import { KazumiSearchPreferences } from './kazumi-search-preferences'
 
 /**
  * Importing a rule fetches its file and stores it for search. A rule the
@@ -20,10 +26,11 @@ import { KazumiService } from './kazumi.service'
  * panel can show next to that rule, and the reason must not bleed into
  * other rules or survive a retry of the same rule.
  *
- * Searching opens a browser window per rule, so by default only the rule tab
- * the user opens is searched. The "search all rules" switch searches every
- * runnable rule through a shared three-slot cap, and a keyword change drops
- * the searches still waiting for the old keyword.
+ * Searching opens a browser window per rule, so by default only the rule tabs
+ * the user opens for the current keyword are searched. The "search all rules"
+ * switch searches every runnable rule through a shared three-slot cap, with
+ * the active tab first. A keyword change drops the searches still waiting for
+ * the old keyword, and leaving the page keeps the ones already started.
  */
 
 const apiRule = {
@@ -164,6 +171,7 @@ function gateKey(payload: SearchPayload) {
 
 describe('KazumiService rule search', () => {
   let service: KazumiService
+  let preferences: KazumiSearchPreferences
   let queryClient: QueryClient
 
   const xpathRules = ['rule1', 'rule2', 'rule3', 'rule4', 'rule5'].map(
@@ -208,15 +216,22 @@ describe('KazumiService rule search', () => {
   }
 
   // The tab badge and the result panel both observe the search through
-  // injectQuery, so the test subscribes the same way the components do.
+  // injectQuery, so the test subscribes the same way the components do. The
+  // observers live in their own injector so a test can destroy them the way
+  // leaving the search page does.
   function observeAllRules() {
-    return TestBed.runInInjectionContext(() =>
+    const injector = createEnvironmentInjector(
+      [],
+      TestBed.inject(EnvironmentInjector)
+    )
+    runInInjectionContext(injector, () =>
       allRules.map((policy) =>
         injectQuery(() =>
           service.getSearchQueryOptions(service.$searchQuery(), policy)
         )
       )
     )
+    return injector
   }
 
   function configureTestBed() {
@@ -239,6 +254,7 @@ describe('KazumiService rule search', () => {
       ],
     })
     service = TestBed.inject(KazumiService)
+    preferences = TestBed.inject(KazumiSearchPreferences)
   }
 
   beforeEach(() => {
@@ -255,13 +271,13 @@ describe('KazumiService rule search', () => {
   })
 
   it('is off until the user turns it on, and remembers the choice', () => {
-    expect(service.$searchAllRules()).toBe(false)
+    expect(preferences.$searchAllRules()).toBe(false)
 
-    service.setSearchAllRules(true)
+    preferences.setSearchAllRules(true)
 
     TestBed.resetTestingModule()
     configureTestBed()
-    expect(service.$searchAllRules()).toBe(true)
+    expect(preferences.$searchAllRules()).toBe(true)
   })
 
   it('searches only the rule tabs the user opens while the switch is off', async () => {
@@ -295,8 +311,46 @@ describe('KazumiService rule search', () => {
     expect(peak).toBe(1)
   })
 
+  it('starts a new keyword with only the active tab while the switch is off', async () => {
+    observeAllRules()
+
+    service.updateQuery('frieren')
+    TestBed.tick()
+    await vi.waitFor(() => {
+      expect(searched()).toEqual(['rule1:frieren'])
+    })
+    finish('rule1:frieren')
+
+    for (const rule of [xpathRules[2], xpathRules[4]]) {
+      service.setActivePolicy(rule)
+      TestBed.tick()
+      await vi.waitFor(() => {
+        expect(searched()).toContain(`${rule.name}:frieren`)
+      })
+      finish(`${rule.name}:frieren`)
+    }
+    await vi.waitFor(() => {
+      expect(active).toBe(0)
+    })
+
+    service.updateQuery('mushoku')
+    TestBed.tick()
+    await vi.waitFor(() => {
+      expect(searched()).toContain('rule5:mushoku')
+    })
+    finish('rule5:mushoku')
+    await vi.waitFor(() => {
+      expect(active).toBe(0)
+    })
+
+    expect(searched().filter((key) => key.endsWith(':mushoku'))).toEqual([
+      'rule5:mushoku',
+    ])
+    expect(peak).toBe(1)
+  })
+
   it('searches every runnable rule at most three at a time while the switch is on', async () => {
-    service.setSearchAllRules(true)
+    preferences.setSearchAllRules(true)
     observeAllRules()
 
     service.updateQuery('  frieren  ')
@@ -334,8 +388,82 @@ describe('KazumiService rule search', () => {
     ])
   })
 
+  it('keeps the searches running when every observer leaves and comes back', async () => {
+    preferences.setSearchAllRules(true)
+    const observers = observeAllRules()
+
+    service.updateQuery('frieren')
+    TestBed.tick()
+    await vi.waitFor(() => {
+      expect(gates.size).toBe(3)
+    })
+
+    observers.destroy()
+    TestBed.tick()
+    finish('rule1:frieren')
+    await vi.waitFor(() => {
+      expect(gates.size).toBe(4)
+    })
+
+    observeAllRules()
+    TestBed.tick()
+    finish('rule2:frieren')
+    finish('rule3:frieren')
+    finish('rule4:frieren')
+    await vi.waitFor(() => {
+      expect(gates.size).toBe(5)
+    })
+    finish('rule5:frieren')
+    await vi.waitFor(() => {
+      expect(active).toBe(0)
+    })
+
+    expect(searched()).toEqual([
+      'rule1:frieren',
+      'rule2:frieren',
+      'rule3:frieren',
+      'rule4:frieren',
+      'rule5:frieren',
+    ])
+    for (const rule of xpathRules) {
+      expect(
+        queryClient.getQueryData(queryKeys.kazumi.search(rule.name, 'frieren'))
+      ).toEqual([])
+    }
+  })
+
+  it('lets the active tab take the next free slot ahead of the queue', async () => {
+    preferences.setSearchAllRules(true)
+    observeAllRules()
+
+    service.updateQuery('frieren')
+    TestBed.tick()
+    await vi.waitFor(() => {
+      expect(gates.size).toBe(3)
+    })
+
+    service.setActivePolicy(xpathRules[4])
+    TestBed.tick()
+    finish('rule1:frieren')
+    await vi.waitFor(() => {
+      expect(gates.size).toBe(4)
+    })
+    expect(searched()[3]).toBe('rule5:frieren')
+
+    finish('rule2:frieren')
+    finish('rule3:frieren')
+    finish('rule5:frieren')
+    await vi.waitFor(() => {
+      expect(gates.size).toBe(5)
+    })
+    finish('rule4:frieren')
+    await vi.waitFor(() => {
+      expect(active).toBe(0)
+    })
+  })
+
   it('drops the searches still waiting for the old keyword when it changes', async () => {
-    service.setSearchAllRules(true)
+    preferences.setSearchAllRules(true)
     observeAllRules()
 
     service.updateQuery('frieren')
@@ -390,7 +518,7 @@ describe('KazumiService rule search', () => {
   })
 
   it('never searches a rule the scraper cannot run', () => {
-    service.setSearchAllRules(true)
+    preferences.setSearchAllRules(true)
 
     expect(
       service.getSearchQueryOptions('frieren', xpathRules[0]).enabled
@@ -401,7 +529,7 @@ describe('KazumiService rule search', () => {
   })
 
   it('waits for a keyword', () => {
-    service.setSearchAllRules(true)
+    preferences.setSearchAllRules(true)
 
     expect(service.getSearchQueryOptions('   ', xpathRules[0]).enabled).toBe(
       false

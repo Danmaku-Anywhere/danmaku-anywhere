@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core'
 import { SHORTCUT_GROUPS } from '../../../core/shortcuts/shortcut.definitions'
 import { ShortcutService } from '../../../core/shortcuts/shortcut.service'
-import { KazumiService } from '../../kazumi/services/kazumi.service'
+import { KazumiSearchPreferences } from '../../kazumi/services/kazumi-search-preferences'
 
 @Component({
   selector: 'da-general-settings',
@@ -30,8 +30,8 @@ import { KazumiService } from '../../kazumi/services/kazumi.service'
           <input
             type="checkbox"
             class="w-4 h-4 accent-pink-500"
-            [checked]="kazumiService.$searchAllRules()"
-            (change)="kazumiService.setSearchAllRules(!kazumiService.$searchAllRules())"
+            [checked]="searchPreferences.$searchAllRules()"
+            (change)="searchPreferences.setSearchAllRules(!searchPreferences.$searchAllRules())"
           />
           <span>同时搜索所有规则</span>
         </label>
@@ -67,6 +67,6 @@ import { KazumiService } from '../../kazumi/services/kazumi.service'
 })
 export class GeneralSettings {
   protected readonly shortcutService = inject(ShortcutService)
-  protected readonly kazumiService = inject(KazumiService)
+  protected readonly searchPreferences = inject(KazumiSearchPreferences)
   protected readonly groups = SHORTCUT_GROUPS
 }

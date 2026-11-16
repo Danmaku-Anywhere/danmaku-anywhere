@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createLimiter } from './createLimiter'
+import { createLimiter, StaleTaskError } from './createLimiter'
 
 /**
  * Searches arrive from several callers over time rather than as one list, so
  * the limit has to live in a shared gate. A failing task must give its slot
- * back, and a task whose signal is aborted while it waits must never run.
+ * back, a task that went stale while it waited must never run, and an urgent
+ * waiting task takes the next free slot ahead of the others.
  */
 
 function deferred() {
@@ -66,37 +67,57 @@ describe('createLimiter', () => {
     await expect(second).resolves.toBe('ok')
   })
 
-  it('skips a waiting task once its signal is aborted', async () => {
+  it('skips a waiting task that went stale before its turn', async () => {
     const limit = createLimiter(1)
     const gate = deferred()
-    const controller = new AbortController()
-    const stale = vi.fn(async () => 'stale')
+    let stale = false
+    const staleTask = vi.fn(async () => 'stale')
     const fresh = vi.fn(async () => 'fresh')
 
     const first = limit(() => gate.promise)
-    const second = limit(stale, controller.signal)
+    const second = limit(staleTask, { isStale: () => stale })
     const third = limit(fresh)
 
-    controller.abort()
+    stale = true
     gate.resolve()
 
     await expect(first).resolves.toBeUndefined()
-    await expect(second).rejects.toMatchObject({ name: 'AbortError' })
+    await expect(second).rejects.toBeInstanceOf(StaleTaskError)
     await expect(third).resolves.toBe('fresh')
-    expect(stale).not.toHaveBeenCalled()
+    expect(staleTask).not.toHaveBeenCalled()
     expect(fresh).toHaveBeenCalledTimes(1)
   })
 
-  it('rejects a task that is already aborted without taking a slot', async () => {
+  it('rejects a task that is already stale without taking a slot', async () => {
     const limit = createLimiter(1)
-    const controller = new AbortController()
-    controller.abort()
     const task = vi.fn(async () => 'never')
 
-    await expect(limit(task, controller.signal)).rejects.toMatchObject({
-      name: 'AbortError',
-    })
+    await expect(limit(task, { isStale: () => true })).rejects.toBeInstanceOf(
+      StaleTaskError
+    )
     await expect(limit(async () => 'next')).resolves.toBe('next')
     expect(task).not.toHaveBeenCalled()
+  })
+
+  it('hands the next free slot to an urgent task ahead of the queue', async () => {
+    const limit = createLimiter(1)
+    const gate = deferred()
+    const order: string[] = []
+
+    const first = limit(() => gate.promise)
+    const rest = ['a', 'b', 'c'].map((name) =>
+      limit(
+        async () => {
+          order.push(name)
+        },
+        { isUrgent: () => name === 'c' }
+      )
+    )
+
+    gate.resolve()
+    await first
+    await Promise.all(rest)
+
+    expect(order).toEqual(['c', 'a', 'b'])
   })
 })
