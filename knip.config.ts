@@ -28,12 +28,6 @@ const config: KnipConfig = {
       playwright: false,
       vite: false,
     },
-    'backend/proxy': {
-      ignoreDependencies: [
-        // cloudflare:test is a virtual module provided by the Workers runtime
-        'cloudflare',
-      ],
-    },
   },
 }
 

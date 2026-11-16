@@ -1,6 +1,5 @@
 packages:
   - 'packages/**'
-  - 'backend/**'
   - 'tools/**'
 nodeLinker: isolated
 allowBuilds:

@@ -45,10 +45,6 @@ alias pformat="pnpm run format"
 alias ext-dev="cd packages/danmaku-anywhere && pnpm run dev"
 alias ext-build="cd packages/danmaku-anywhere && pnpm run build"
 
-# Backend specific
-alias backend-dev="cd backend/proxy && pnpm run dev"
-alias backend-deploy="cd backend/proxy && pnpm run deploy"
-
 # Workspace management
 alias workspace-clean="pnpm run clean"
 alias workspace-fresh="pnpm run clean && pnpm install"
@@ -67,11 +63,9 @@ echo ""
 echo "🔗 Available commands:"
 echo "  pdev      - Run development server"
 echo "  ext-dev   - Run extension development server"
-echo "  backend-dev - Run backend development server"
 echo ""
 echo "📂 Project structure:"
 echo "  packages/danmaku-anywhere/ - Browser extension (React)"
-echo "  backend/proxy/            - Cloudflare Workers backend"
 echo "  packages/                 - Core TypeScript packages"
 echo ""
 echo "🚀 Ready to start developing! Try running 'pdev' to start all development servers." 

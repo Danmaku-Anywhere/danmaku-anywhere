@@ -65,7 +65,6 @@ Make the changes. Apply these in order:
 | Area          | Verify command                                     | Manual verification                               |
 | ------------- | -------------------------------------------------- | ------------------------------------------------- |
 | Extension     | See `packages/danmaku-anywhere/AGENTS.md`          | **Open dev browser** at start of work (see below) |
-| Backend       | See `backend/proxy/AGENTS.md`                      | N/A                                               |
 | Packages      | `pnpm --filter <package> test`                     | N/A                                               |
 | Cross-cutting | `pnpm lint && pnpm --filter '...[origin/master]' test` | Depends on areas touched                          |
 

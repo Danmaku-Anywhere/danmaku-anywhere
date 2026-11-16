@@ -80,8 +80,7 @@
       "packages/danmaku-model",
       "packages/danmaku-engine",
       "packages/danmaku-provider",
-      "packages/web-scraper",
-      "backend/proxy"
+      "packages/web-scraper"
     ]
   },
   "recommendations": {
