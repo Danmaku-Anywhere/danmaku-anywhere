@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common'
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   input,
   signal,
 } from '@angular/core'
@@ -32,7 +33,7 @@ import { preferredPoster } from '../../../utils/subject-images'
       <div class="flex flex-col lg:flex-row gap-6">
         <div class="flex-shrink-0">
           <da-image
-            [src]="preferredPoster(subjectData.images)"
+            [src]="$poster()"
             [alt]="subjectData.name"
             loading="eager"
             styleClass="w-48 lg:w-56 aspect-[2/3] object-cover rounded-lg shadow-lg"
@@ -167,7 +168,9 @@ import { preferredPoster } from '../../../utils/subject-images'
 export class SubjectHeader {
   subject = input.required<BgmSubject>()
   protected tagsExpanded = signal(false)
-  protected readonly preferredPoster = preferredPoster
+  protected readonly $poster = computed(() => {
+    return preferredPoster(this.subject().images)
+  })
 
   protected toggleTagsExpanded() {
     this.tagsExpanded.update((expanded) => !expanded)

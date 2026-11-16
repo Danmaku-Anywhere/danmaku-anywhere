@@ -11,7 +11,8 @@ import { Card } from 'primeng/card'
 import { Tag } from 'primeng/tag'
 import { DaImage } from '../../../shared/components/da-image'
 import { BangumiService } from '../services/bangumi.service'
-import { preferredThumbnail } from '../utils/subject-images'
+import { COVER_FALLBACK } from '../utils/subject-images'
+import { ThumbnailPipe } from '../utils/thumbnail.pipe'
 import { HorizontalCardSkeletonGrid } from './horizontal-card-skeleton-grid'
 
 @Component({
@@ -24,6 +25,7 @@ import { HorizontalCardSkeletonGrid } from './horizontal-card-skeleton-grid'
     HorizontalCardSkeletonGrid,
     Tag,
     DaImage,
+    ThumbnailPipe,
   ],
   template: `
     @if (relationsQuery.isPending()) {
@@ -35,7 +37,8 @@ import { HorizontalCardSkeletonGrid } from './horizontal-card-skeleton-grid'
           @for (relation of response.data; track relation.subject.id) {
             <div class="flex gap-4">
               <da-image
-                [src]="preferredThumbnail(relation.subject.images, 80)"
+                [src]="relation.subject.images | daThumbnail: 80"
+                [fallback]="coverFallback"
                 [alt]="relation.subject.name"
                 styleClass="w-20 h-28 object-cover rounded"
               />
@@ -80,7 +83,7 @@ import { HorizontalCardSkeletonGrid } from './horizontal-card-skeleton-grid'
 export class RelationsTab {
   subjectId = input.required<number>()
   visited = input<boolean>(false)
-  protected readonly preferredThumbnail = preferredThumbnail
+  protected readonly coverFallback = COVER_FALLBACK
 
   private bangumiService = inject(BangumiService)
 

@@ -8,21 +8,26 @@ import { DaImage } from './da-image'
  * Bangumi's image host drops the first request for a cold image, so a failed
  * load is retried once with a query parameter that gives the retry its own
  * cache key. A second failure falls back to the placeholder instead of
- * looping, and a new src starts the cycle over.
+ * looping, a new src starts the cycle over, and a slot can swap the generic
+ * placeholder for its own fallback artwork, which also covers an empty src.
  */
+
+const COVER_FALLBACK = 'assets/cover_fallback.webp'
 
 @Component({
   imports: [DaImage],
-  template: `<da-image [src]="src()" />`,
+  template: `<da-image [src]="src()" [fallback]="fallback()" />`,
 })
 class Host {
   readonly src = signal('https://lain.bgm.tv/cover.jpg')
+  readonly fallback = signal(IMAGE_PLACEHOLDER_DATA)
 }
 
-function setup(src: string) {
+function setup(src: string, fallback = IMAGE_PLACEHOLDER_DATA) {
   TestBed.configureTestingModule({ imports: [Host] })
   const fixture = TestBed.createComponent(Host)
   fixture.componentInstance.src.set(src)
+  fixture.componentInstance.fallback.set(fallback)
   fixture.detectChanges()
   const img = fixture.nativeElement.querySelector('img') as HTMLImageElement
   return { fixture, img }
@@ -69,6 +74,26 @@ describe('DaImage', () => {
     fixture.detectChanges()
 
     expect(img.getAttribute('src')).toBe(IMAGE_PLACEHOLDER_DATA)
+  })
+
+  it('falls back to the slot artwork when one is given', () => {
+    const { fixture, img } = setup(
+      'https://lain.bgm.tv/cover.jpg',
+      COVER_FALLBACK
+    )
+
+    img.dispatchEvent(new Event('error'))
+    fixture.detectChanges()
+    img.dispatchEvent(new Event('error'))
+    fixture.detectChanges()
+
+    expect(img.getAttribute('src')).toBe(COVER_FALLBACK)
+  })
+
+  it('shows the fallback right away for an empty source', () => {
+    const { img } = setup('', COVER_FALLBACK)
+
+    expect(img.getAttribute('src')).toBe(COVER_FALLBACK)
   })
 
   it('does not retry an empty source', () => {

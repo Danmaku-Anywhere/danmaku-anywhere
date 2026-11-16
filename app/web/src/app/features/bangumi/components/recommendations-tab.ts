@@ -10,7 +10,8 @@ import { injectQuery } from '@tanstack/angular-query-experimental'
 import { Card } from 'primeng/card'
 import { DaImage } from '../../../shared/components/da-image'
 import { BangumiService } from '../services/bangumi.service'
-import { preferredThumbnail } from '../utils/subject-images'
+import { COVER_FALLBACK } from '../utils/subject-images'
+import { ThumbnailPipe } from '../utils/thumbnail.pipe'
 import { HorizontalCardSkeletonGrid } from './horizontal-card-skeleton-grid'
 
 @Component({
@@ -22,6 +23,7 @@ import { HorizontalCardSkeletonGrid } from './horizontal-card-skeleton-grid'
     Card,
     HorizontalCardSkeletonGrid,
     DaImage,
+    ThumbnailPipe,
   ],
   template: `
     @if (recommendationsQuery.isPending()) {
@@ -33,7 +35,8 @@ import { HorizontalCardSkeletonGrid } from './horizontal-card-skeleton-grid'
           @for (recommendation of response.data; track recommendation.subject.id) {
             <div class="flex gap-4">
               <da-image
-                [src]="preferredThumbnail(recommendation.subject.images, 80)"
+                [src]="recommendation.subject.images | daThumbnail: 80"
+                [fallback]="coverFallback"
                 [alt]="recommendation.subject.name"
                 styleClass="w-20 h-28 object-cover rounded"
               />
@@ -78,7 +81,7 @@ import { HorizontalCardSkeletonGrid } from './horizontal-card-skeleton-grid'
 export class RecommendationsTab {
   subjectId = input.required<number>()
   visited = input<boolean>(false)
-  protected readonly preferredThumbnail = preferredThumbnail
+  protected readonly coverFallback = COVER_FALLBACK
 
   private bangumiService = inject(BangumiService)
 

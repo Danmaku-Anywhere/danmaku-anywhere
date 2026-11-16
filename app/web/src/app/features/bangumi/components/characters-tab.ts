@@ -11,12 +11,12 @@ import { Card } from 'primeng/card'
 import { ProgressSpinner } from 'primeng/progressspinner'
 import { DaImage } from '../../../shared/components/da-image'
 import { BangumiService } from '../services/bangumi.service'
-import { preferredThumbnail } from '../utils/subject-images'
+import { ThumbnailPipe } from '../utils/thumbnail.pipe'
 
 @Component({
   selector: 'da-characters-tab',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, ProgressSpinner, Card, DaImage],
+  imports: [CommonModule, ProgressSpinner, Card, DaImage, ThumbnailPipe],
   template: `
     @if (charactersQuery.isPending()) {
       <div class="flex justify-center py-8">
@@ -29,7 +29,7 @@ import { preferredThumbnail } from '../utils/subject-images'
           @for (character of response.data; track character.character.id) {
             <div class="flex gap-4">
               <da-image
-                [src]="preferredThumbnail(character.character.images, 64)"
+                [src]="character.character.images | daThumbnail: 64"
                 [alt]="character.character.name"
                 styleClass="w-16 h-16 object-cover rounded"
               />
@@ -62,7 +62,6 @@ import { preferredThumbnail } from '../utils/subject-images'
 export class CharactersTab {
   subjectId = input.required<number>()
   visited = input<boolean>(false)
-  protected readonly preferredThumbnail = preferredThumbnail
 
   private bangumiService = inject(BangumiService)
 

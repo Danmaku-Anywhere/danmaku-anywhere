@@ -19,14 +19,26 @@ const images = {
   grid: 'https://lain.bgm.tv/r/100/pic/cover/l/4f/2f/299673_l8B8U.jpg',
 }
 
-const subject = {
+const subject: LegacyBgmSubject = {
   id: 299673,
+  type: 2,
   name: '転スラ日記 転生したらスライムだった件',
   name_cn: '转生史莱姆日记',
-  rating: { rank: 1, score: 8.7, total: 1000 },
-  meta_tags: ['TV'],
+  summary: '',
+  series: false,
+  nsfw: false,
+  locked: false,
+  date: '2021-04-06',
+  platform: 'TV',
   images,
-} as unknown as LegacyBgmSubject
+  volumes: 0,
+  eps: 12,
+  total_episodes: 12,
+  rating: { rank: 1, total: 1000, count: {}, score: 8.7 },
+  collection: { wish: 0, collect: 0, doing: 0, on_hold: 0, dropped: 0 },
+  meta_tags: ['TV'],
+  tags: [],
+}
 
 @Component({
   imports: [BangumiSearchResultListItem],

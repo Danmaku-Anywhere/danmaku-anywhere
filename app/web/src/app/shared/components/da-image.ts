@@ -31,13 +31,16 @@ export class DaImage {
   height = input<number>()
   loading = input<'eager' | 'lazy'>('lazy')
   styleClass = input<string>('')
+  fallback = input<string>(IMAGE_PLACEHOLDER_DATA)
 
-  protected readonly $currentSrc = linkedSignal(() => this.src())
+  protected readonly $currentSrc = linkedSignal(() => {
+    return this.src() || this.fallback()
+  })
 
   protected onError() {
     const source = this.src()
     if (!source || this.$currentSrc() !== source) {
-      this.$currentSrc.set(IMAGE_PLACEHOLDER_DATA)
+      this.$currentSrc.set(this.fallback())
       return
     }
     this.$currentSrc.set(this.retrySource(source))
