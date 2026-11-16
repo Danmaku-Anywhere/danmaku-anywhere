@@ -1,6 +1,6 @@
 {
   "name": "@danmaku-anywhere/integration-policy",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Schema, serialization and migrations for Danmaku Anywhere integration policies",
   "author": "Mr-Quin",
   "repository": {
