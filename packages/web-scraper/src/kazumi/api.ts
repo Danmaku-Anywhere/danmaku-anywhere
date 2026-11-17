@@ -10,17 +10,41 @@ import { isRecord, readJsonPath, readJsonPathFirst } from './jsonPath.js'
 
 type Variables = Record<string, unknown>
 
+type BodyType = 'json' | 'form' | 'none'
+
+export type SessionHeaderSetter = (
+  matchUrl: string,
+  headers: Record<string, string>
+) => Promise<AsyncDisposable>
+
+export type KazumiApiOptions = {
+  setSessionHeader?: SessionHeaderSetter
+  timeoutMs?: number
+}
+
 type PreparedRequest = {
   method: 'GET' | 'POST'
   url: string
   headers: Record<string, string>
+  sessionHeaders: Record<string, string>
   query: Record<string, unknown>
-  bodyType: string
+  bodyType: BodyType
   body: unknown
 }
 
 const VARIABLE_PATTERN = /(?<![A-Za-z0-9_])@([A-Za-z_][A-Za-z0-9_]*)/g
 const EXACT_VARIABLE_PATTERN = /^@([A-Za-z_][A-Za-z0-9_]*)$/
+
+const DEFAULT_TIMEOUT_MS = 30_000
+
+// fetch() silently drops these request headers, so they are applied with a
+// declarativeNetRequest session rule around the request instead.
+const SESSION_HEADER_NAMES: Record<string, string> = {
+  referer: 'Referer',
+  'user-agent': 'User-Agent',
+  cookie: 'Cookie',
+  origin: 'Origin',
+}
 
 function stringValue(value: unknown): string {
   if (value === null || value === undefined) {
@@ -43,6 +67,44 @@ function toStringRecord(value: unknown): Record<string, string> {
     result[key] = item === null || item === undefined ? '' : String(item)
   }
   return result
+}
+
+function parseJson(raw: string): unknown {
+  try {
+    return JSON.parse(raw)
+  } catch {
+    throw new Error('API response is not JSON')
+  }
+}
+
+function parseBodyType(value: string): BodyType {
+  if (value === 'json' || value === 'form' || value === 'none') {
+    return value
+  }
+  throw new Error(`Unsupported API body type: ${value}`)
+}
+
+function splitHeaders(
+  rendered: Record<string, string>,
+  baseUrl: string
+): Pick<PreparedRequest, 'headers' | 'sessionHeaders'> {
+  const headers: Record<string, string> = {}
+  const sessionHeaders: Record<string, string> = {
+    Referer: baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`,
+  }
+  for (const [name, value] of Object.entries(rendered)) {
+    const sessionName = SESSION_HEADER_NAMES[name.toLowerCase()]
+    if (sessionName) {
+      sessionHeaders[sessionName] = value
+    } else {
+      headers[name] = value
+    }
+  }
+  return { headers, sessionHeaders }
+}
+
+function isTimeoutError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'TimeoutError'
 }
 
 export function renderTemplate(
@@ -87,7 +149,8 @@ export function renderValue(value: unknown, variables: Variables): unknown {
 
 export function prepareRequest(
   config: KazumiApiRequest,
-  variables: Variables
+  variables: Variables,
+  baseUrl: string
 ): PreparedRequest {
   const upperMethod = config.method.toUpperCase()
   let method: 'GET' | 'POST' = 'GET'
@@ -96,6 +159,7 @@ export function prepareRequest(
   } else if (upperMethod !== 'GET') {
     throw new Error(`Unsupported API method: ${upperMethod}`)
   }
+  const bodyType = parseBodyType(config.bodyType)
 
   const trimmedUrl = config.url.trim()
   if (!trimmedUrl) {
@@ -112,20 +176,25 @@ export function prepareRequest(
     throw new Error(`Invalid API url: ${url}`)
   }
 
-  const hasBody = method === 'POST' && config.bodyType !== 'none'
+  const hasBody = method === 'POST' && bodyType !== 'none'
   return {
     method,
     url,
-    headers: toStringRecord(renderValue(config.headers, variables)),
+    ...splitHeaders(
+      toStringRecord(renderValue(config.headers, variables)),
+      baseUrl
+    ),
     query: toRecord(renderValue(config.query, variables)),
-    bodyType: config.bodyType,
+    bodyType,
     body: hasBody ? renderValue(config.body, variables) : undefined,
   }
 }
 
 export async function executeRequest(
-  request: PreparedRequest
+  request: PreparedRequest,
+  options: KazumiApiOptions = {}
 ): Promise<string> {
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const url = new URL(request.url)
   for (const [key, value] of Object.entries(request.query)) {
     if (value === null || value === undefined) {
@@ -145,6 +214,7 @@ export async function executeRequest(
     method: request.method,
     headers,
     credentials: 'include',
+    signal: AbortSignal.timeout(timeoutMs),
   }
   if (request.method === 'POST' && request.body !== undefined) {
     if (!headers.has('content-type')) {
@@ -162,7 +232,24 @@ export async function executeRequest(
     }
   }
 
-  const response = await fetch(url, init)
+  await using _sessionRule = options.setSessionHeader
+    ? await options.setSessionHeader(
+        `${url.origin}${url.pathname}`,
+        request.sessionHeaders
+      )
+    : null
+
+  let response: Response
+  try {
+    response = await fetch(url, init)
+  } catch (error) {
+    if (isTimeoutError(error)) {
+      throw new Error(
+        `API request timed out after ${timeoutMs / 1000}s: ${url.host}`
+      )
+    }
+    throw error
+  }
   if (!response.ok) {
     throw new Error(`API request failed: ${response.status} ${url.host}`)
   }
@@ -176,7 +263,7 @@ export function parseSearch(
   if (config.sourceTemplate && !config.sourceTemplate.includes('@source')) {
     throw new Error('Search source template is missing @source')
   }
-  const document: unknown = JSON.parse(raw)
+  const document = parseJson(raw)
   const nodes = readJsonPath(document, config.listPath)
   const results: KazumiSearchResult[] = []
   for (const node of nodes) {
@@ -397,7 +484,7 @@ export function parseChapters(
   baseUrl: string
 ): KazumiChapterResult[][] {
   assertChapterConfig(config)
-  const document: unknown = JSON.parse(raw)
+  const document = parseJson(raw)
   const variables: Variables = { source }
   for (const [key, path] of Object.entries(config.variables)) {
     const value = readJsonPathFirst(document, path)
@@ -419,14 +506,15 @@ export function parseChapters(
 
 export async function kazumiSearchApi(
   keyword: string,
-  policy: KazumiPolicy
+  policy: KazumiPolicy,
+  options: KazumiApiOptions = {}
 ): Promise<KazumiSearchResult[]> {
   const config = policy.searchApiConfig
   if (!config) {
     throw new Error(`Policy ${policy.name} has no search API config`)
   }
-  const request = prepareRequest(config.request, { keyword })
-  const results = parseSearch(await executeRequest(request), config)
+  const request = prepareRequest(config.request, { keyword }, policy.baseURL)
+  const results = parseSearch(await executeRequest(request, options), config)
   if (policy.chapterMode === 'api') {
     return results
   }
@@ -440,15 +528,20 @@ export async function kazumiSearchApi(
 
 export async function kazumiGetChaptersApi(
   contentUrl: string,
-  policy: KazumiPolicy
+  policy: KazumiPolicy,
+  options: KazumiApiOptions = {}
 ): Promise<KazumiChapterResult[][]> {
   const config = policy.chapterApiConfig
   if (!config) {
     throw new Error(`Policy ${policy.name} has no chapter API config`)
   }
-  const request = prepareRequest(config.request, { source: contentUrl })
+  const request = prepareRequest(
+    config.request,
+    { source: contentUrl },
+    policy.baseURL
+  )
   return parseChapters(
-    await executeRequest(request),
+    await executeRequest(request, options),
     config,
     contentUrl,
     policy.baseURL

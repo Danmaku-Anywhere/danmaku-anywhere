@@ -42,6 +42,24 @@ const requestConfig = {
   body: undefined,
 }
 
+const baseUrl = 'https://www.example.com/'
+
+const preparedGet = {
+  method: 'GET' as const,
+  url: 'https://example.com/api',
+  headers: {},
+  sessionHeaders: { Referer: baseUrl },
+  query: {},
+  bodyType: 'none' as const,
+  body: undefined,
+}
+
+const preparedPost = {
+  ...preparedGet,
+  method: 'POST' as const,
+  url: 'https://api.example.com/rpc',
+}
+
 afterEach(() => {
   vi.unstubAllGlobals()
 })
@@ -77,12 +95,51 @@ describe('prepareRequest', () => {
   it('renders query values for a GET request', () => {
     const request = prepareRequest(
       { ...requestConfig, query: { wd: '@keyword', mid: '1', page: 1 } },
-      { keyword: 'fate' }
+      { keyword: 'fate' },
+      baseUrl
     )
 
     expect(request.method).toBe('GET')
     expect(request.query).toEqual({ wd: 'fate', mid: '1', page: 1 })
     expect(request.body).toBeUndefined()
+  })
+
+  it('sends the base url as Referer unless the rule names one', () => {
+    expect(
+      prepareRequest(requestConfig, {}, 'https://www.example.com')
+        .sessionHeaders
+    ).toEqual({ Referer: 'https://www.example.com/' })
+    expect(
+      prepareRequest(
+        { ...requestConfig, headers: { referer: 'https://other.example/' } },
+        {},
+        baseUrl
+      ).sessionHeaders
+    ).toEqual({ Referer: 'https://other.example/' })
+  })
+
+  it('moves the headers fetch would drop into the session rule', () => {
+    const request = prepareRequest(
+      {
+        ...requestConfig,
+        headers: {
+          apikey: 'key',
+          'User-Agent': 'Kazumi/1.0',
+          Cookie: 'session=@keyword',
+          origin: 'https://www.example.com',
+        },
+      },
+      { keyword: 'abc' },
+      baseUrl
+    )
+
+    expect(request.headers).toEqual({ apikey: 'key' })
+    expect(request.sessionHeaders).toEqual({
+      Referer: baseUrl,
+      'User-Agent': 'Kazumi/1.0',
+      Cookie: 'session=abc',
+      Origin: 'https://www.example.com',
+    })
   })
 
   it('renders url, headers and body for a POST json request', () => {
@@ -95,7 +152,8 @@ describe('prepareRequest', () => {
         bodyType: 'json',
         body: { p_id: '@source', page: 1 },
       },
-      { source: 'abc' }
+      { source: 'abc' },
+      baseUrl
     )
 
     expect(request.url).toBe('https://api.example.com/rpc/abc')
@@ -105,14 +163,24 @@ describe('prepareRequest', () => {
 
   it('rejects unsupported methods and invalid urls', () => {
     expect(() =>
-      prepareRequest({ ...requestConfig, method: 'PUT' }, {})
+      prepareRequest({ ...requestConfig, method: 'PUT' }, {}, baseUrl)
     ).toThrow('Unsupported API method: PUT')
     expect(() =>
-      prepareRequest({ ...requestConfig, url: 'not-a-url' }, {})
+      prepareRequest({ ...requestConfig, url: 'not-a-url' }, {}, baseUrl)
     ).toThrow('Invalid API url: not-a-url')
-    expect(() => prepareRequest({ ...requestConfig, url: '   ' }, {})).toThrow(
-      'API request url is empty'
-    )
+    expect(() =>
+      prepareRequest({ ...requestConfig, url: '   ' }, {}, baseUrl)
+    ).toThrow('API request url is empty')
+  })
+
+  it('rejects an unknown body type', () => {
+    expect(() =>
+      prepareRequest(
+        { ...requestConfig, method: 'POST', bodyType: 'xml', body: '<a/>' },
+        {},
+        baseUrl
+      )
+    ).toThrow('Unsupported API body type: xml')
   })
 })
 
@@ -122,12 +190,9 @@ describe('executeRequest', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     const text = await executeRequest({
-      method: 'GET',
-      url: 'https://example.com/api',
+      ...preparedGet,
       headers: { apikey: 'key' },
       query: { wd: 'fate', page: 1 },
-      bodyType: 'none',
-      body: undefined,
     })
 
     expect(text).toBe('{"ok":true}')
@@ -136,20 +201,14 @@ describe('executeRequest', () => {
     const init = call[1] as RequestInit
     expect(url.toString()).toBe('https://example.com/api?wd=fate&page=1')
     expect(init.method).toBe('GET')
+    expect(new Headers(init.headers).get('apikey')).toBe('key')
   })
 
   it('sends cookies with API requests', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response('{}'))
     vi.stubGlobal('fetch', fetchMock)
 
-    await executeRequest({
-      method: 'GET',
-      url: 'https://example.com/api',
-      headers: {},
-      query: {},
-      bodyType: 'none',
-      body: undefined,
-    })
+    await executeRequest(preparedGet)
 
     const init = fetchMock.mock.calls[0][1] as RequestInit
     expect(init.credentials).toBe('include')
@@ -160,10 +219,7 @@ describe('executeRequest', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     await executeRequest({
-      method: 'POST',
-      url: 'https://api.example.com/rpc',
-      headers: {},
-      query: {},
+      ...preparedPost,
       bodyType: 'json',
       body: { p_id: 'abc' },
     })
@@ -181,10 +237,7 @@ describe('executeRequest', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     await executeRequest({
-      method: 'POST',
-      url: 'https://api.example.com/rpc',
-      headers: {},
-      query: {},
+      ...preparedPost,
       bodyType: 'form',
       body: { keyword: 'fate zero', page: 1 },
     })
@@ -202,16 +255,86 @@ describe('executeRequest', () => {
       vi.fn().mockResolvedValue(new Response('', { status: 503 }))
     )
 
+    await expect(executeRequest(preparedGet)).rejects.toThrow(
+      'API request failed: 503'
+    )
+  })
+
+  it('keeps the session headers installed only while the request runs', async () => {
+    const events: string[] = []
+    const fetchMock = vi.fn().mockImplementation(async () => {
+      events.push('fetch')
+      return new Response('{}')
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const setSessionHeader = vi.fn().mockImplementation(async () => {
+      events.push('install')
+      return {
+        async [Symbol.asyncDispose]() {
+          events.push('remove')
+        },
+      }
+    })
+
+    await executeRequest(
+      {
+        ...preparedGet,
+        query: { wd: 'fate' },
+        sessionHeaders: { Referer: baseUrl, Cookie: 'session=abc' },
+      },
+      { setSessionHeader }
+    )
+
+    expect(setSessionHeader).toHaveBeenCalledWith('https://example.com/api', {
+      Referer: baseUrl,
+      Cookie: 'session=abc',
+    })
+    expect(events).toEqual(['install', 'fetch', 'remove'])
+  })
+
+  it('removes the session headers when the request fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
+    )
+    const remove = vi.fn()
+    const setSessionHeader = vi.fn().mockResolvedValue({
+      [Symbol.asyncDispose]: remove,
+    })
+
     await expect(
-      executeRequest({
-        method: 'GET',
-        url: 'https://example.com/api',
-        headers: {},
-        query: {},
-        bodyType: 'none',
-        body: undefined,
-      })
-    ).rejects.toThrow('API request failed: 503')
+      executeRequest(preparedGet, { setSessionHeader })
+    ).rejects.toThrow('Failed to fetch')
+    expect(remove).toHaveBeenCalledTimes(1)
+  })
+
+  it('gives up on a request that never answers', async () => {
+    const fetchMock = vi.fn().mockImplementation(
+      (_url: URL, init: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () => {
+            reject(init.signal?.reason)
+          })
+        })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      executeRequest(preparedGet, { timeoutMs: 20 })
+    ).rejects.toThrow('API request timed out after 0.02s: example.com')
+    const init = fetchMock.mock.calls[0][1] as RequestInit
+    expect(init.signal).toBeInstanceOf(AbortSignal)
+  })
+
+  it('uses a 30 second timeout by default', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{}'))
+    vi.stubGlobal('fetch', fetchMock)
+    const timeoutSpy = vi.spyOn(AbortSignal, 'timeout')
+
+    await executeRequest(preparedGet)
+
+    expect(timeoutSpy).toHaveBeenCalledWith(30_000)
+    timeoutSpy.mockRestore()
   })
 })
 
@@ -253,6 +376,12 @@ describe('parseSearch', () => {
         namePath: '$.title',
       })
     ).toEqual([{ name: 'B', url: 'abc' }])
+  })
+
+  it('reports a response that is not JSON in plain words', () => {
+    expect(() =>
+      parseSearch('<html><body>Just a moment...</body></html>', searchConfig)
+    ).toThrow('API response is not JSON')
   })
 })
 
@@ -423,6 +552,12 @@ describe('parseChapters', () => {
     ).toThrow('No chapters found')
   })
 
+  it('reports a chapter response that is not JSON in plain words', () => {
+    expect(() =>
+      parseChapters('not json', chapterConfig, 's', 'https://example.com/')
+    ).toThrow('API response is not JSON')
+  })
+
   it('throws when the chapter config has no episode url source', () => {
     expect(() =>
       parseChapters(
@@ -533,6 +668,25 @@ describe('api rule entry points', () => {
     await expect(
       kazumiSearchApi('keyword', policyWithSearch('api'))
     ).resolves.toEqual([{ name: 'Show', url: '1342' }])
+  })
+
+  it('installs the rule base url as Referer around the search request', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(searchResponse))
+    )
+    const setSessionHeader = vi.fn().mockResolvedValue({
+      [Symbol.asyncDispose]: vi.fn(),
+    })
+
+    await kazumiSearchApi('keyword', policyWithSearch('api'), {
+      setSessionHeader,
+    })
+
+    expect(setSessionHeader).toHaveBeenCalledWith(
+      'https://api.example.com/search',
+      { Referer: 'https://www.example.com/' }
+    )
   })
 })
 

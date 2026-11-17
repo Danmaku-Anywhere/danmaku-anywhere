@@ -80,8 +80,32 @@ describe('api mode routing', () => {
     await expect(kazumiSearch('keyword', apiSearchPolicy)).resolves.toEqual(
       results
     )
-    expect(searchApiMock).toHaveBeenCalledWith('keyword', apiSearchPolicy)
+    expect(searchApiMock).toHaveBeenCalledWith('keyword', apiSearchPolicy, {})
     expect(createTab).not.toHaveBeenCalled()
+  })
+
+  it('hands the request options to the API implementation', async () => {
+    searchApiMock.mockResolvedValue([])
+    chaptersApiMock.mockResolvedValue([])
+    const options = { setSessionHeader: vi.fn(), timeoutMs: 5 }
+
+    await kazumiSearch('keyword', apiSearchPolicy, options)
+    await kazumiGetChapters(
+      'https://example.com/show',
+      apiChapterPolicy,
+      options
+    )
+
+    expect(searchApiMock).toHaveBeenCalledWith(
+      'keyword',
+      apiSearchPolicy,
+      options
+    )
+    expect(chaptersApiMock).toHaveBeenCalledWith(
+      'https://example.com/show',
+      apiChapterPolicy,
+      options
+    )
   })
 
   it('kazumiGetChapters asks the API implementation for an api chapter rule', async () => {
@@ -93,7 +117,8 @@ describe('api mode routing', () => {
     ).resolves.toEqual(roads)
     expect(chaptersApiMock).toHaveBeenCalledWith(
       'https://example.com/show',
-      apiChapterPolicy
+      apiChapterPolicy,
+      {}
     )
     expect(createTab).not.toHaveBeenCalled()
   })
