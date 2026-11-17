@@ -1,0 +1,38 @@
+{
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+  "minimumVersion": "3.43.2",
+  "ignorePatterns": ["legacy/**"],
+  "entry": [
+    // Entry points declared in manifest.ts and pages/*.html, which fallow does not read.
+    "packages/danmaku-anywhere/src/background/index.ts",
+    "packages/danmaku-anywhere/src/content/app/index.ts",
+    "packages/danmaku-anywhere/src/content/controller/index.tsx",
+    "packages/danmaku-anywhere/src/content/player/index.ts",
+    "packages/danmaku-anywhere/src/content/player/occlusion/segmenterFrame.ts",
+    "packages/danmaku-anywhere/src/popup/index.tsx",
+    // vite.config.ts swaps this in for @/devApi in production builds.
+    "packages/danmaku-anywhere/src/devApi/index.prod.ts",
+    "packages/danmaku-provider/src/providers/*/index.ts"
+  ],
+  "supportEntry": [
+    "scripts/*.mjs",
+    "packages/danmaku-anywhere/scripts/*.mjs",
+    "packages/danmaku-provider/openapi-ts.config.ts"
+  ],
+  // The provider's exports map points at src/**/*.js, which only exists as .ts.
+  // Bundlers and tsc swap the extension, fallow does not.
+  "ignoreUnresolvedImports": ["@danmaku-anywhere/danmaku-provider/*"],
+  // Read through import.meta.glob and a template-literal import, which fallow cannot follow.
+  "ignoreDependencies": ["@mr-quin/dango-manifests"],
+  // An interface merged with a const of the same name. Only the const is imported
+  // elsewhere, but TypeScript requires both halves to be exported together.
+  "ignoreExports": [
+    {
+      "file": "packages/danmaku-anywhere/src/common/environment/context.ts",
+      "exports": ["EnvironmentContext"]
+    }
+  ],
+  "duplicates": {
+    "ignore": ["packages/bangumi-api/src/*.d.ts", "**/test/mockData.ts"]
+  }
+}

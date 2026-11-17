@@ -5,7 +5,8 @@ import { isXPathPolicy, type KazumiPolicy, zKazumiPolicy } from './kazumi.js'
  * Published Kazumi rules come in two shapes: the classic xpath rules, and
  * newer rules whose search or chapter step runs through an API and leaves
  * the matching XPath selectors empty. The schema has to accept both, keep
- * refusing xpath rules with missing selectors, and strip the API config.
+ * refusing xpath rules with missing selectors, and preserve the API request
+ * config so the extension can execute it.
  */
 
 const xpathRule = {
@@ -47,6 +48,7 @@ const apiRule = {
     listPath: '$[*]',
     namePath: '$.title',
     sourcePath: '$.id',
+    extraField: { kept: true },
   },
   chapterApiConfig: {
     request: {
@@ -77,6 +79,8 @@ describe('zKazumiPolicy', () => {
     if (result.success) {
       expect(result.data.searchMode).toBe('xpath')
       expect(result.data.chapterMode).toBe('xpath')
+      expect(result.data.searchApiConfig).toBeUndefined()
+      expect(result.data.chapterApiConfig).toBeUndefined()
     }
   })
 
@@ -88,8 +92,38 @@ describe('zKazumiPolicy', () => {
       expect(result.data.searchMode).toBe('api')
       expect(result.data.chapterMode).toBe('api')
       expect(result.data.searchURL).toBe('')
-      expect(result.data).not.toHaveProperty('searchApiConfig')
-      expect(result.data).not.toHaveProperty('chapterApiConfig')
+      expect(result.data.searchApiConfig?.request.method).toBe('POST')
+      expect(result.data.searchApiConfig?.request.body).toEqual({
+        search_term: '@keyword',
+      })
+      expect(result.data.searchApiConfig?.listPath).toBe('$[*]')
+      expect(result.data.searchApiConfig).toMatchObject({
+        extraField: { kept: true },
+      })
+      expect(result.data.chapterApiConfig?.format).toBe('nested')
+      expect(result.data.chapterApiConfig?.roadsPath).toBe('$.data.roads[*]')
+    }
+  })
+
+  it('fills the API request defaults when the rule omits them', () => {
+    const result = zKazumiPolicy.safeParse({
+      ...apiRule,
+      searchApiConfig: {},
+      chapterApiConfig: undefined,
+    })
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.searchApiConfig?.request).toEqual({
+        method: 'GET',
+        url: '',
+        headers: {},
+        query: {},
+        bodyType: 'none',
+      })
+      expect(result.data.searchApiConfig?.listPath).toBe('$.data[*]')
+      expect(result.data.searchApiConfig?.sourceTemplate).toBe('')
+      expect(result.data.chapterApiConfig).toBeUndefined()
     }
   })
 
@@ -100,6 +134,8 @@ describe('zKazumiPolicy', () => {
     if (result.success) {
       expect(result.data.searchMode).toBe('api')
       expect(result.data.chapterRoads).toBe(xpathRule.chapterRoads)
+      expect(result.data.searchApiConfig?.sourcePath).toBe('$.id')
+      expect(result.data.chapterApiConfig).toBeUndefined()
     }
   })
 
