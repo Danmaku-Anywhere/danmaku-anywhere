@@ -1,4 +1,4 @@
-import { chineseToNumber } from './chineseToNumber'
+import { chineseToNumber } from '@/common/utils/chineseToNumber'
 import { mediaRegexMatcher } from './mediaRegexMatcher'
 import type { ExtractorMatch, MediaInfoParseResult } from './types'
 
@@ -30,21 +30,37 @@ class ParsingContext {
     this.originalTitle = originalTitle
     this.searchTitle = this.originalTitle
   }
+}
 
-  public appendSeason(seasonId: string) {
-    const numericSeason = chineseToNumber(seasonId)
-    if (numericSeason !== null) {
-      // season is numeric
-      if (!this.searchTitle.includes(`S${numericSeason}`)) {
-        this.searchTitle = `${this.searchTitle} S${numericSeason}`
-      }
-    } else {
-      const trimmedSeasonId = seasonId.trim()
-      if (!this.searchTitle.includes(trimmedSeasonId)) {
-        this.searchTitle = `${this.searchTitle} ${trimmedSeasonId}`
-      }
+function escapeRegex(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function seasonTokens(season: string): string[] {
+  const tokens = [season.trim()]
+  const numericSeason = chineseToNumber(season)
+  if (numericSeason !== null) {
+    tokens.push(`S${numericSeason}`)
+  }
+  return tokens
+}
+
+// Removes the season from the title when it is written there as its own
+// token, so "GS2 Show" keeps its S2 while "Show S2" loses it.
+function stripSeason(title: string, season: string): string {
+  for (const token of seasonTokens(season)) {
+    if (!token) {
+      continue
+    }
+    const pattern = new RegExp(
+      `(?<![A-Za-z0-9])${escapeRegex(token)}(?![A-Za-z0-9])`,
+      'i'
+    )
+    if (pattern.test(title)) {
+      return title.replace(pattern, ' ')
     }
   }
+  return title
 }
 
 function coerceToNumber(val: string | number): number {
@@ -124,9 +140,7 @@ export class MediaParser {
           ctx.result.episodeTitle = g.episodeTitle.trim()
         }
 
-        if (ctx.result.season) {
-          ctx.appendSeason(ctx.result.season)
-        }
+        this.rebuildSearchTitle(ctx)
 
         return true
       }
@@ -169,6 +183,15 @@ export class MediaParser {
       )
       if (match) {
         ctx.result.season = match.raw
+      } else if (ctx.episodeMatchIndex !== null) {
+        // "S2E05" and "S4第02集" glue the season onto the episode, where the
+        // common season patterns do not reach
+        const gluedSeason = ctx.originalTitle
+          .substring(0, ctx.episodeMatchIndex)
+          .match(/(?:^|\s)(S\d+)$/i)
+        if (gluedSeason) {
+          ctx.result.season = gluedSeason[1]
+        }
       }
     }
   }
@@ -176,17 +199,11 @@ export class MediaParser {
   private rebuildSearchTitle(ctx: ParsingContext) {
     // Truncate the title at the episode match index
     if (ctx.episodeMatchIndex !== null && ctx.episodeMatchIndex >= 0) {
-      ctx.searchTitle = ctx.originalTitle
-        .substring(0, ctx.episodeMatchIndex)
-        .trim()
-
-      if (ctx.result.season) {
-        ctx.appendSeason(ctx.result.season)
-      }
+      ctx.searchTitle = ctx.originalTitle.substring(0, ctx.episodeMatchIndex)
     }
-    // If no episode found in title, probably non-episode media
-    else if (ctx.result.season) {
-      ctx.appendSeason(ctx.result.season)
+
+    if (ctx.result.season) {
+      ctx.searchTitle = stripSeason(ctx.searchTitle, ctx.result.season)
     }
 
     // Remove double spaces
@@ -214,6 +231,7 @@ export class MediaParser {
     return {
       searchTitle: ctx.searchTitle,
       originalTitle: ctx.originalTitle,
+      season: ctx.result.season,
       episode: ctx.result.episode,
       episodeTitle: ctx.result.episodeTitle,
     }

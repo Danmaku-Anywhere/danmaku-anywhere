@@ -31,6 +31,7 @@ export function useFindEpisodeDanmaku({ loadMutation, mountOutcome }: Loader) {
         title,
         episodeNumber: media.episode,
         originalTitle: season ? undefined : media.originalTitle,
+        seasonDecorator: season ? undefined : media.seasonDecorator,
         seasonId: season?.id,
       })
       if (!run.isCurrent()) {

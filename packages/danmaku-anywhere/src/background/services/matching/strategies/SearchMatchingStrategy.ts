@@ -3,6 +3,7 @@ import { inject, injectable } from 'inversify'
 import { SeasonService } from '@/background/services/persistence/SeasonService'
 import { TitleMappingService } from '@/background/services/persistence/TitleMappingService'
 import type { MatchEpisodeInput, MatchEpisodeResult } from '@/common/anime/dto'
+import { parseSeasonNumber, rankBySeason } from '@/common/anime/seasonRank'
 import { isCustomSeason } from '@/common/danmaku/utils'
 import { type ILogger, LoggerSymbol } from '@/common/Logger'
 import { SeasonMap } from '@/common/seasonMap/SeasonMap'
@@ -31,7 +32,7 @@ export class SearchMatchingStrategy implements IMatchingStrategy {
   }
 
   async match(input: MatchEpisodeInput): Promise<MatchEpisodeResult | null> {
-    const { title, mapKey, episodeNumber } = input
+    const { title, mapKey, episodeNumber, seasonDecorator } = input
 
     const autoProvider =
       await this.sourceCapabilities.getFirstSearchMatchProvider()
@@ -54,13 +55,12 @@ export class SearchMatchingStrategy implements IMatchingStrategy {
       return { status: 'notFound', data: null, cause: 'No seasons found' }
     }
 
-    if (foundSeasons.length === 1) {
-      const firstSeason = foundSeasons[0] as Season
-      this.logger.debug('Single season found, auto-mapping', firstSeason)
+    const { chosen, ordered } = this.pickBySeason(foundSeasons, seasonDecorator)
 
-      await this.titleMappingService.add(
-        SeasonMap.fromSeason(mapKey, firstSeason)
-      )
+    if (chosen) {
+      this.logger.debug('Single season found, auto-mapping', chosen)
+
+      await this.titleMappingService.add(SeasonMap.fromSeason(mapKey, chosen))
 
       if (episodeNumber === undefined) {
         return {
@@ -72,7 +72,7 @@ export class SearchMatchingStrategy implements IMatchingStrategy {
 
       try {
         const data = await this.episodeResolver.resolveEpisode(
-          firstSeason,
+          chosen,
           episodeNumber
         )
         return {
@@ -91,8 +91,30 @@ export class SearchMatchingStrategy implements IMatchingStrategy {
 
     return {
       status: 'disambiguation',
-      data: foundSeasons.filter((s) => !isCustomSeason(s)),
+      data: ordered.filter((s) => !isCustomSeason(s)),
       metadata: { strategy: 'search', providerConfig: autoProvider },
+    }
+  }
+
+  private pickBySeason(
+    foundSeasons: Season[],
+    seasonDecorator: string | undefined
+  ): { chosen: Season | undefined; ordered: Season[] } {
+    const wanted =
+      seasonDecorator === undefined ? null : parseSeasonNumber(seasonDecorator)
+
+    if (wanted === null) {
+      return {
+        chosen: foundSeasons.length === 1 ? foundSeasons[0] : undefined,
+        ordered: foundSeasons,
+      }
+    }
+
+    const { matches, others } = rankBySeason(foundSeasons, wanted)
+    this.logger.debug(`Season ${wanted}: ${matches.length} results match`)
+    return {
+      chosen: matches.length === 1 ? matches[0] : undefined,
+      ordered: [...matches, ...others],
     }
   }
 }

@@ -1,8 +1,10 @@
 export interface MediaInfoParseResult {
-  // Title which is used for searching and identification
+  // The bare show title used for searching, with the season taken out
   searchTitle: string
   // The original full title as it was found
   originalTitle: string
+  // The season as written on the page, such as "S2", "第二季" or "2"
+  season?: string
   episode?: number
   episodeTitle?: string
 }

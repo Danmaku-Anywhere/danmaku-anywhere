@@ -56,6 +56,7 @@ export function extractMediaInfo(
 
     const mediaInfo = new MediaInfo({
       title: result.searchTitle,
+      seasonDecorator: result.season,
       episode: result.episode,
       episodeTitle: result.episodeTitle,
       originalTitle: result.originalTitle,

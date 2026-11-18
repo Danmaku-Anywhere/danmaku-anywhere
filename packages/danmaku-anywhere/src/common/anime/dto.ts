@@ -31,6 +31,9 @@ export interface MatchEpisodeInput {
   episodeNumber?: number
   // if available, use seasonId to disambiguate
   seasonId?: number
+  // the season as written on the page ("S2", "第二季", "2"), used to pick
+  // among search results
+  seasonDecorator?: string
   originalTitle?: string
 }
 

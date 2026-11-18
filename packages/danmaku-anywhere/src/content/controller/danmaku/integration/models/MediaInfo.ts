@@ -1,4 +1,5 @@
 import { i18n } from '@/common/localization/i18n'
+import { chineseToNumber } from '@/common/utils/chineseToNumber'
 
 export interface MediaInfoDto {
   /**
@@ -57,11 +58,19 @@ export class MediaInfo {
    * The key is used to map a season to an id in the db.
    * The key only includes the season title (and related information like numeric season number)
    * We assume that the same key represents the same season even on different sites.
+   *
+   * Older versions searched with the season appended to the title and keyed
+   * mappings on that string, so the key keeps that shape: a numeric season
+   * becomes "S<n>", any other decorator is appended as written.
    */
   getKey() {
-    if (this.seasonDecorator === undefined) return `${this.title.trim()}`
+    const title = this.title.trim()
+    if (this.seasonDecorator === undefined) return title
 
-    return `${this.title.trim()}%%${this.seasonDecorator.trim()}`
+    const numericSeason = chineseToNumber(this.seasonDecorator)
+    const suffix =
+      numericSeason === null ? this.seasonDecorator.trim() : `S${numericSeason}`
+    return `${title} ${suffix}`
   }
 
   toString() {
