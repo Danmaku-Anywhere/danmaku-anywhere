@@ -47,6 +47,8 @@ class ParsingContext {
   }
 }
 
+const TRAILING_SEPARATORS = /[-\s.:|·•・｜：–]+$/
+
 function coerceToNumber(val: string | number): number {
   if (typeof val === 'number') {
     return val
@@ -178,7 +180,7 @@ export class MediaParser {
     if (ctx.episodeMatchIndex !== null && ctx.episodeMatchIndex >= 0) {
       ctx.searchTitle = ctx.originalTitle
         .substring(0, ctx.episodeMatchIndex)
-        .trim()
+        .replace(TRAILING_SEPARATORS, '')
 
       if (ctx.result.season) {
         ctx.appendSeason(ctx.result.season)
