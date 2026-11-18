@@ -10,6 +10,8 @@ import { type BindContext, bindVideo } from './bindVideo'
  * still: the refreeze waits for danmu's next render tick and for each danmaku
  * it created to start moving or leave. Drives the plugin with a fake video and
  * a fake danmu manager whose render ticks and danmaku the test controls.
+ * Also checks that a collapse head pill lives until its group closes, whether
+ * its count is live or static.
  */
 
 type Hook = (value: unknown) => void
@@ -20,6 +22,7 @@ function fakeManager() {
     playing: false,
     accepts: true,
     pushes: 0,
+    flexibleDurations: [] as number[],
     plugins: [] as Record<string, unknown>[],
     freeze: vi.fn(() => {
       state.frozen = true
@@ -43,7 +46,10 @@ function fakeManager() {
       }
       return state.accepts
     },
-    pushFlexibleDanmaku: () => true,
+    pushFlexibleDanmaku: (_: unknown, options: { duration: number }) => {
+      state.flexibleDurations.push(options.duration)
+      return true
+    },
     use: (plugin: Record<string, unknown>) => {
       state.plugins.push(plugin)
       return plugin
@@ -349,5 +355,73 @@ describe('bindVideo after a seek on a paused video', () => {
 
     expect(manager.freeze).toHaveBeenCalledTimes(1)
     expect(manager.isPlaying()).toBe(false)
+  })
+})
+
+describe('bindVideo head pill lifetime', () => {
+  function bindHead(liveCount: boolean) {
+    const video = fakeVideo(false)
+    const manager = fakeManager()
+    const head = comment(10)
+    const decision: Decision = {
+      kind: 'head',
+      label: head.text,
+      pulse: false,
+      auto: true,
+      finalCount: 3,
+      endTime: 12,
+    }
+    const ctx: BindContext = {
+      decisions: [decision],
+      bumpEvents: [],
+      bumpsByHead: new Map(),
+      heads: [0],
+      onHeadEmit: () => ({
+        label: head.text,
+        pulse: false,
+        store: {
+          subscribe: () => () => undefined,
+          getSnapshot: () => ({ count: 1 }),
+          setCount: () => undefined,
+        },
+        headIndex: 0,
+      }),
+      onSetCount: () => undefined,
+    }
+    const config = {
+      ...DEFAULT_DANMAKU_OPTIONS,
+      collapse: {
+        ...DEFAULT_DANMAKU_OPTIONS.collapse,
+        pattern: { ...DEFAULT_DANMAKU_OPTIONS.collapse.pattern, liveCount },
+      },
+    }
+    bindVideo(
+      video as unknown as HTMLMediaElement,
+      [head],
+      () => config,
+      ctx
+    )(manager as unknown as Manager<ParsedComment>)
+    video.currentTime = 10.5
+    video.dispatchEvent(new Event('timeupdate'))
+    return manager.flexibleDurations
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal(
+      'document',
+      Object.assign(new EventTarget(), { visibilityState: 'visible' })
+    )
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('a live-count pill lasts until its group closes', () => {
+    expect(bindHead(true)).toEqual([1500])
+  })
+
+  it('a static-count pill lasts until its group closes too', () => {
+    expect(bindHead(false)).toEqual([1500])
   })
 })

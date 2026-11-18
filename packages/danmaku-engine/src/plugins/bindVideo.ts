@@ -231,11 +231,7 @@ export const bindVideo =
         }
       }
 
-      // Live counts linger past the last absorb so the climb finishes on
-      // screen; static counts get the regular top-danmaku lifetime.
-      const durationMs = config.collapse.pattern.liveCount
-        ? Math.max(16, (decision.endTime - offsetTime) * 1000)
-        : DURATION_MS
+      const durationMs = Math.max(16, (decision.endTime - offsetTime) * 1000)
 
       const headComment: ParsedComment = {
         ...original,
