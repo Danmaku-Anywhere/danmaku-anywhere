@@ -134,6 +134,12 @@ export class IntegrationPage {
     return this.page.getByTestId('controller-window')
   }
 
+  // The button's drag container and the controller window are MUI Poppers,
+  // which carry role="tooltip" too, so a role lookup matches them as well.
+  tooltipBubble(): Locator {
+    return this.page.locator('.MuiTooltip-tooltip')
+  }
+
   private get target(): Page | Frame {
     return this.videoFrame ?? this.page
   }

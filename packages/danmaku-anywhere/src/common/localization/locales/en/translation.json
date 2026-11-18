@@ -294,8 +294,7 @@
     "unknown": "Something went wrong."
   },
   "floatingButton": {
-    "label": "Open Danmaku Anywhere",
-    "tooltip": "Danmaku Anywhere. Right-click for quick actions"
+    "label": "Open Danmaku Anywhere"
   },
   "form": {
     "precision": {
