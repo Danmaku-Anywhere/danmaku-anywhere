@@ -1,11 +1,24 @@
-import type { KazumiPolicy } from '@danmaku-anywhere/danmaku-provider/kazumi'
-import type { KazumiChapterResult, KazumiSearchResult } from '../types.js'
+import type {
+  KazumiChapterResult,
+  KazumiPolicy,
+  KazumiSearchResult,
+} from '@danmaku-anywhere/extension-protocol'
 import { createJob, createTab, Logger } from '../utils.js'
+import {
+  type KazumiApiOptions,
+  kazumiGetChaptersApi,
+  kazumiSearchApi,
+} from './api.js'
 
 export const kazumiSearch = async (
   keyword: string,
-  policy: KazumiPolicy
+  policy: KazumiPolicy,
+  options: KazumiApiOptions = {}
 ): Promise<KazumiSearchResult[]> => {
+  if (policy.searchMode === 'api') {
+    return kazumiSearchApi(keyword, policy, options)
+  }
+
   // Replace @keyword in the search URL with the actual keyword
   const searchUrl = policy.searchURL.replace(
     '@keyword',
@@ -100,8 +113,13 @@ export const kazumiSearch = async (
 
 export const kazumiGetChapters = async (
   contentUrl: string,
-  policy: KazumiPolicy
+  policy: KazumiPolicy,
+  options: KazumiApiOptions = {}
 ): Promise<KazumiChapterResult[][]> => {
+  if (policy.chapterMode === 'api') {
+    return kazumiGetChaptersApi(contentUrl, policy, options)
+  }
+
   await using tabResource = await createTab(contentUrl)
 
   const { tabId } = tabResource

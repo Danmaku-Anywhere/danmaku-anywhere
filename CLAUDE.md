@@ -7,8 +7,8 @@ This file provides context for Claude and Cursor working on this codebase.
 Danmaku Anywhere is an open-source project for overlaying danmaku (bullet comments) on video websites. It consists of:
 
 - **Browser extension** (`packages/danmaku-anywhere/`) — Chrome/Firefox extension that injects danmaku onto video pages (Plex, Jellyfin, YouTube, etc.)
-- **Web app** (`app/web/`) — Angular SPA for video discovery/playback using Kazumi rules, requires the extension
-- **Backend** (`backend/proxy/`) — Cloudflare Workers API (Hono) for proxying, auth, and LLM features
+- **Web app**: an Angular SPA for video discovery and playback using Kazumi rules. It lives in `Danmaku-Anywhere/web` and installs `danmaku-model` and `extension-protocol` from npm.
+- **Backend**: Cloudflare Workers API (Hono) for proxying, auth, and LLM features. It lives in `Danmaku-Anywhere/backend` and installs `integration-policy` from npm.
 - **Shared packages** — TypeScript libraries used across the above
 
 ## Monorepo structure
@@ -16,18 +16,13 @@ Danmaku Anywhere is an open-source project for overlaying danmaku (bullet commen
 ```
 packages/
   danmaku-anywhere/     # Browser extension
-  danmaku-converter/    # Parse/normalize danmaku formats
+  danmaku-model/        # Shared data model (comments, episodes, seasons) and XML conversion
   danmaku-engine/       # Render danmaku on video containers
   danmaku-provider/     # Fetch danmaku from APIs
   web-scraper/          # Scrape video/page metadata from sites
-  bangumi-api/          # Typed Bangumi API schemas
-  result/               # Result<T, E> type for error handling
+  extension-protocol/   # Messages between the extension and the web app
   integration-policy/   # Schema for site/feature integration policies
-app/
-  web/                  # Angular web app
-backend/
-  proxy/                # Cloudflare Workers backend
-docs/                   # Astro-based documentation site
+architecture/           # Design notes for the extension
 ```
 
 ## Quick reference
@@ -42,8 +37,6 @@ docs/                   # Astro-based documentation site
 | Run all tests | `pnpm test` |
 | Format | `pnpm format` |
 | Dev extension | `cd packages/danmaku-anywhere && pnpm dev` |
-| Dev web app | `cd app/web && pnpm start` |
-| Dev backend | `cd backend/proxy && pnpm dev` |
 | Extract i18n keys | `cd packages/danmaku-anywhere && pnpm i18n extract` |
 
 Always prefer scripts defined in `package.json` over ad-hoc commands. Run `pnpm type-check` instead of `tsc`/`tsgo`, `pnpm lint` instead of `biome check`, etc. When you need to run a CLI tool not available as a script, use `pnpx` (never `npx`).
@@ -53,7 +46,7 @@ Always prefer scripts defined in `package.json` over ad-hoc commands. Run `pnpm 
 - **Run affected tests only**: `pnpm --filter '...[origin/master]' test` to test only packages changed since master
 - **Single package**: `pnpm --filter <package> test`
 - **All tests**: `pnpm test` at root
-- Packages and backend use Vitest. The web app uses Jasmine+Karma (`pnpm test:ng` in `app/web/`).
+- Packages use Vitest.
 - Always run `pnpm type-check` and `pnpm lint` — these are fast and catch most issues.
 - **Never run the extension's full e2e suite locally.** `pnpm test:e2e` is CI's job. Locally run the
   affected spec(s), and at most `pnpm test:e2e:smoke`. `pnpm test:e2e:changed` follows direct
@@ -103,7 +96,7 @@ Always prefer scripts defined in `package.json` over ad-hoc commands. Run `pnpm 
 
 ## Error handling
 
-- Use the `Result` type from `@danmaku-anywhere/result` for explicit error handling
+- For expected failures, return a `{ success: true, data } | { success: false, error }` result, the shape `danmaku-provider` APIs already return
 - Avoid throwing exceptions for expected error paths
 
 ## Model selection
@@ -137,8 +130,9 @@ Lefthook runs Biome check on staged files before each commit (auto-fixes formatt
 
 ## Common pitfalls
 
-- Always run `pnpm build:packages` before running the extension or web app in dev mode, since they import from workspace packages
+- Always run `pnpm build:packages` before running the extension in dev mode, since it imports from workspace packages
 - The extension uses `@crxjs/vite-plugin` which has its own HMR behavior — don't confuse with standard Vite
-- The web app requires the browser extension to be installed for scraping features
 - `pnpm-lock.yaml` is in `.cursorignore` — don't try to read it
-- The project uses `pnpm@10.11.0` — do not use npm or yarn
+- The project uses `pnpm@11.2.2` — do not use npm or yarn
+- Danmaku Builds (the release manager) lives in `Danmaku-Anywhere/release-manager` now. Never delete the `release-manager-latest` release or its tag here: copies older than 0.5.0 still update through it.
+- The documentation site lives in `Danmaku-Anywhere/docs` now. Its changelog page is regenerated daily from this repo's published releases, so release notes are the place to fix changelog text.

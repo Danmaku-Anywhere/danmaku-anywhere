@@ -11,7 +11,7 @@ import type {
   Season,
   SeasonInsert,
   WithSeason,
-} from '@danmaku-anywhere/danmaku-converter'
+} from '@danmaku-anywhere/danmaku-model'
 import type { ExtractTitleResponse } from '@danmaku-anywhere/danmaku-provider/genAi'
 import type {
   KazumiChapterPayload,
@@ -19,7 +19,7 @@ import type {
   KazumiSearchPayload,
   KazumiSearchResult,
   SetHeaderRule,
-} from '@danmaku-anywhere/web-scraper'
+} from '@danmaku-anywhere/extension-protocol'
 import type { ConfigSchema } from '@mr-quin/dango'
 import type {
   GenericVodSearchData,

@@ -1,8 +1,5 @@
 packages:
-  - 'packages/**'
-  - 'backend/**'
-  - 'app/**'
-  - 'tools/**'
+  - 'packages/*'
 nodeLinker: isolated
 allowBuilds:
   '@parcel/watcher': false
