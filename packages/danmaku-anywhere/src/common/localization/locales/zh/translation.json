@@ -286,8 +286,7 @@
     "unknown": "出错啦！"
   },
   "floatingButton": {
-    "label": "打开 Danmaku Anywhere",
-    "tooltip": "Danmaku Anywhere。右键打开快捷操作"
+    "label": "打开 Danmaku Anywhere"
   },
   "form": {
     "precision": {

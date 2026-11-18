@@ -63,6 +63,8 @@ function stripSeason(title: string, season: string): string {
   return title
 }
 
+const TRAILING_SEPARATORS = /[-\s.:|·•・｜：–]+$/
+
 function coerceToNumber(val: string | number): number {
   if (typeof val === 'number') {
     return val
@@ -206,8 +208,10 @@ export class MediaParser {
       ctx.searchTitle = stripSeason(ctx.searchTitle, ctx.result.season)
     }
 
-    // Remove double spaces
-    ctx.searchTitle = ctx.searchTitle.replace(/\s+/g, ' ').trim()
+    ctx.searchTitle = ctx.searchTitle
+      .replace(TRAILING_SEPARATORS, '')
+      .replace(/\s+/g, ' ')
+      .trim()
   }
 
   private extractField(

@@ -26,12 +26,23 @@ export interface CompileConfig {
   stageDurationSec: number
 }
 
+// Texts that differ only in width, zero-width characters or whitespace look
+// identical on screen, so dedupe and auto-collapse group them together.
+function normalizeGroupText(text: string): string {
+  return text
+    .normalize('NFKC')
+    .replace(/\p{Cf}/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 /** Pure static pass over the time-sorted comment list. */
 export function compile(
   items: readonly CompileInput[],
   config: CompileConfig
 ): CompileResult {
   const decisions: Decision[] = new Array(items.length)
+  const groupTexts: string[] = new Array(items.length)
 
   const compiledPatterns = compilePatterns(config.collapse.pattern.patterns)
   const compiledWhiteList = compileRules(config.collapse.whiteList)
@@ -55,15 +66,16 @@ export function compile(
       decisions[i] = { kind: 'whitelist' }
       continue
     }
+    groupTexts[i] = normalizeGroupText(item.text)
     if (!dedupeEnabled) {
       continue
     }
-    const open = lastBatchByText.get(item.text)
+    const open = lastBatchByText.get(groupTexts[i])
     if (open && item.time - open.startTime <= dedupeWindowSec) {
       open.indices.push(i)
     } else {
       const batch: Batch = { startTime: item.time, indices: [i] }
-      lastBatchByText.set(item.text, batch)
+      lastBatchByText.set(groupTexts[i], batch)
       allBatches.push(batch)
     }
   }
@@ -101,7 +113,7 @@ export function compile(
         key = `p:${m.pattern.label}`
         label = m.pattern.label
       } else if (autoCollapse) {
-        key = `a:${item.text}`
+        key = `a:${groupTexts[i]}`
         label = item.text
         auto = true
       }

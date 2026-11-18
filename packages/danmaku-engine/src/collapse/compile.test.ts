@@ -4,8 +4,9 @@ import type { CollapseConfig, Decision, LabeledPattern } from './types'
 
 /**
  * Static-compile correctness: precedence (block > whitelist > dedupe > pattern
- * > autoCollapse), dedupe batch threshold (≤max drops, >max passes all), and
- * collapse sliding-window absorb semantics.
+ * > autoCollapse), dedupe batch threshold (≤max drops, >max passes all),
+ * collapse sliding-window absorb semantics, and the grouping key that treats
+ * whitespace and width variants of a text as the same comment.
  */
 
 function items(...specs: [string, number][]) {
@@ -200,6 +201,78 @@ describe('compile - collapse heads and absorbs', () => {
       expect(head.auto).toBe(true)
       expect(head.finalCount).toBe(2)
     }
+  })
+})
+
+describe('compile - grouping key ignores whitespace and width', () => {
+  const autoCollapseOnly: Partial<CollapseConfig> = {
+    dedupe: { enabled: false, windowMs: 100, maxDedupe: 2 },
+    pattern: { ...baseConfig().pattern, autoCollapse: true },
+  }
+  const zeroWidthSpace = String.fromCodePoint(0x200b)
+  const ideographicSpace = String.fromCodePoint(0x3000)
+
+  it('collapses trailing space, full-width and zero-width variants into one head', () => {
+    const texts = [
+      '233',
+      '233',
+      '233 ',
+      '233',
+      '233 ',
+      '２３３',
+      `233${zeroWidthSpace}`,
+    ]
+    const { decisions } = run(
+      texts.map((text, i) => ({ text, time: i * 0.5 })),
+      autoCollapseOnly
+    )
+    const head = decisions[0]
+    expect(head.kind).toBe('head')
+    if (head.kind === 'head') {
+      expect(head.label).toBe('233')
+      expect(head.finalCount).toBe(7)
+    }
+    for (let i = 1; i < texts.length; i++) {
+      expect(decisions[i]).toEqual({
+        kind: 'absorbed',
+        headIndex: 0,
+        count: i + 1,
+      })
+    }
+  })
+
+  it('keeps the first comment text as the head label', () => {
+    const { decisions } = run(
+      items(['２３３ ', 0], ['233', 1]),
+      autoCollapseOnly
+    )
+    const head = decisions[0]
+    expect(head.kind).toBe('head')
+    if (head.kind === 'head') {
+      expect(head.label).toBe('２３３ ')
+    }
+  })
+
+  it('treats inner whitespace runs and leading space as the same text', () => {
+    const { decisions } = run(
+      items(
+        ['hello world', 0],
+        [' hello  world', 1],
+        [`hello${ideographicSpace}world`, 2]
+      ),
+      autoCollapseOnly
+    )
+    expect(decisions.map((d) => d.kind)).toEqual([
+      'head',
+      'absorbed',
+      'absorbed',
+    ])
+  })
+
+  it('dedupes variants that differ only in whitespace or width', () => {
+    const { decisions } = run(items(['233', 0], ['２３３ ', 0.05]))
+    expect(decisions[0]).toEqual({ kind: 'normal' })
+    expect(decisions[1]).toEqual({ kind: 'dedupe' })
   })
 })
 

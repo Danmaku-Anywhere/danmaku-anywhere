@@ -6,7 +6,6 @@ import {
   Fade,
   SpeedDialIcon,
   styled,
-  Tooltip,
 } from '@mui/material'
 import type { MouseEventHandler } from 'react'
 import { forwardRef, useRef, useState } from 'react'
@@ -142,37 +141,24 @@ export const FloatingButton = forwardRef<
                       },
                     }}
                   >
-                    <Tooltip
-                      title={
-                        isOpen || contextMenuAnchor
-                          ? ''
-                          : t(
-                              'floatingButton.tooltip',
-                              'Danmaku Anywhere. Right-click for quick actions'
-                            )
-                      }
-                      placement="right"
-                      enterDelay={600}
+                    <StyledFab
+                      size="small"
+                      aria-label={t(
+                        'floatingButton.label',
+                        'Open Danmaku Anywhere'
+                      )}
+                      onContextMenu={handleContextMenu}
+                      ref={mergedFabRefs}
+                      color={dialColor}
+                      hover={fabHover}
+                      onMouseOver={() => setFabHover(true)}
+                      onMouseOut={() => setFabHover(false)}
                     >
-                      <StyledFab
-                        size="small"
-                        aria-label={t(
-                          'floatingButton.label',
-                          'Open Danmaku Anywhere'
-                        )}
-                        onContextMenu={handleContextMenu}
-                        ref={mergedFabRefs}
-                        color={dialColor}
-                        hover={fabHover}
-                        onMouseOver={() => setFabHover(true)}
-                        onMouseOut={() => setFabHover(false)}
-                      >
-                        <SpeedDialIcon />
-                        <FabLoadingIndicator
-                          isLoading={!isDisconnected && isLoading}
-                        />
-                      </StyledFab>
-                    </Tooltip>
+                      <SpeedDialIcon />
+                      <FabLoadingIndicator
+                        isLoading={!isDisconnected && isLoading}
+                      />
+                    </StyledFab>
                   </Badge>
                 </div>
               </Fade>

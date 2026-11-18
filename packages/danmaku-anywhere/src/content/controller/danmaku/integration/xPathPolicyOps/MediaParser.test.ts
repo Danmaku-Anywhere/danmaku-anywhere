@@ -274,4 +274,69 @@ describe('MediaParser', () => {
       })
     })
   })
+
+  describe('Separators before the episode', () => {
+    it.each([
+      '·',
+      '•',
+      '・',
+      '-',
+      '–',
+      '|',
+      '｜',
+      '.',
+      ':',
+      '：',
+    ])('should drop a trailing "%s" left by truncating at the episode', (separator) => {
+      const input = createInput(`Show S2 ${separator} E3`)
+
+      expect(parser.parse(input)).toMatchObject({
+        searchTitle: 'Show',
+        season: 'S2',
+        episode: 3,
+      })
+    })
+
+    it('should drop a trailing separator before a Chinese episode marker', () => {
+      const input = createInput('进击的巨人 - 第3集')
+
+      expect(parser.parse(input)).toMatchObject({
+        searchTitle: '进击的巨人',
+        episode: 3,
+      })
+    })
+
+    it('should drop the separator and keep an explicit season as its own field', () => {
+      const input = createInput('Show · E3', [], {
+        season: { value: 'S2', regex: [] },
+      })
+
+      expect(parser.parse(input)).toMatchObject({
+        searchTitle: 'Show',
+        season: 'S2',
+        episode: 3,
+      })
+    })
+
+    it('should drop a separator that only the season was holding off', () => {
+      const input = createInput('Show - S2 - E3')
+
+      expect(parser.parse(input)).toMatchObject({
+        searchTitle: 'Show',
+        season: 'S2',
+        episode: 3,
+      })
+    })
+
+    it.each([
+      ['K-On! S1E5', 'K-On!'],
+      ['Re:Zero S2E1', 'Re:Zero'],
+      ['Dr. Stone S1E1', 'Dr. Stone'],
+      ['Steins;Gate 0 E1', 'Steins;Gate 0'],
+    ])('should keep punctuation inside the title: %s', (title, expected) => {
+      expect(parser.parse(createInput(title))).toMatchObject({
+        searchTitle: expected,
+      })
+    })
+  })
 })

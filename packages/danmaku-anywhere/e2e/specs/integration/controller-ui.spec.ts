@@ -6,8 +6,9 @@ import { seedFixtureIntegration } from '../../setup/integration'
  * The in-page controller stays usable on awkward screens. The window fits a
  * short viewport, and opens near the bottom-left corner when there is no
  * floating button to open it from. The floating button hides while an iframe
- * is fullscreen, where it could not take clicks, and comes back on exit.
- * Asserts the window's on-screen box and the button's presence.
+ * is fullscreen, where it could not take clicks, and comes back on exit, and
+ * hovering it shows no tooltip. Asserts the window's on-screen box, the
+ * button's presence and the absence of a tooltip.
  */
 
 const ORIGIN = 'https://da-test.invalid'
@@ -89,4 +90,25 @@ test('iframe fullscreen hides the floating button', async ({
 
   await page.evaluate(() => document.exitFullscreen())
   await expect(integrationPage.floatingButton()).toBeVisible()
+})
+
+test('hovering the floating button shows no tooltip', async ({
+  context,
+  page,
+  da,
+}) => {
+  await seedFixtureIntegration(context, da, [MOUNT_PATTERN])
+
+  const integrationPage = new IntegrationPage(page)
+  await page.bringToFront()
+  await integrationPage.open(NATIVE_URL, 'native-video.html')
+  const button = integrationPage.floatingButton()
+  await expect(button).toBeVisible({ timeout: 10_000 })
+
+  await button.hover()
+  await page.waitForTimeout(1_500)
+  // The button fades out a few seconds after the pointer goes still, and a
+  // retrying count would wait for that and pass once the tooltip went with it.
+  await expect(button).toBeVisible()
+  expect(await integrationPage.tooltipBubble().count()).toBe(0)
 })
