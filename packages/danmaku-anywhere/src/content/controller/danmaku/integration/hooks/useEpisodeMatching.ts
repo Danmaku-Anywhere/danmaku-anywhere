@@ -1,6 +1,7 @@
 import type { Season } from '@danmaku-anywhere/danmaku-model'
 import { useEventCallback } from '@mui/material'
 import { useTranslation } from 'react-i18next'
+import { parseSeasonNumber } from '@/common/anime/seasonRank'
 import { isCustomEpisode } from '@/common/danmaku/utils'
 import { useDescribeOutcome } from '@/content/controller/common/hooks/useDescribeOutcome'
 import { useLoadDanmaku } from '@/content/controller/common/hooks/useLoadDanmaku'
@@ -12,6 +13,13 @@ import {
   type FindOutcome,
   useFindEpisodeDanmaku,
 } from './useFindEpisodeDanmaku'
+
+function pageSeasonOf(media: MediaInfo): number | undefined {
+  if (media.seasonDecorator === undefined) {
+    return undefined
+  }
+  return parseSeasonNumber(media.seasonDecorator) ?? undefined
+}
 
 export function useEpisodeMatching(toast: EpisodeToast) {
   const { t } = useTranslation()
@@ -60,6 +68,7 @@ export function useEpisodeMatching(toast: EpisodeToast) {
     const selection = usePopup.getState().offerSelection({
       label: media.toString(),
       seasons,
+      pageSeason: pageSeasonOf(media),
       apply: async (season) => {
         if (applying || !run.isCurrent()) {
           return

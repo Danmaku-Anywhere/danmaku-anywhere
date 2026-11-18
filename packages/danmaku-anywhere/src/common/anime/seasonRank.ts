@@ -99,7 +99,8 @@ export interface SeasonRanking<T> {
   others: T[]
 }
 
-function seasonNumberOf(season: TitledSeason): number {
+/** The season a result is on, read from its titles; 1 when none names one. */
+export function seasonNumberOf(season: TitledSeason): number {
   for (const title of [season.title, ...(season.alternativeTitles ?? [])]) {
     const value = parseSeasonNumber(title)
     if (value !== null) {

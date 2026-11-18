@@ -839,8 +839,13 @@
     }
   },
   "selectorPage": {
+    "hint": "{{name}} 有多个匹配的季，点击一项即可装填弹幕。",
+    "likely": "可能匹配",
     "noAnimeFound": "没有可供选择的内容",
-    "selectAnime": "找到多个匹配项：{{name}}，请选择"
+    "notHere": "都不是？",
+    "otherResults": "其他结果",
+    "searchManually": "手动搜索",
+    "title": "这是哪一季？"
   },
   "skipButton": {
     "skipTo": "空降至 {{time}}"

@@ -870,8 +870,13 @@
     }
   },
   "selectorPage": {
+    "hint": "Several seasons match {{name}}. Click one to load its danmaku.",
+    "likely": "Likely",
     "noAnimeFound": "Nothing to select from",
-    "selectAnime": "Multiple matches found for {{name}}, please select"
+    "notHere": "Not here?",
+    "otherResults": "Other results",
+    "searchManually": "Search manually",
+    "title": "Which season is this?"
   },
   "skipButton": {
     "skipTo": "Skip to {{time}}"

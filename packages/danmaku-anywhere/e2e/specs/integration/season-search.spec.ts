@@ -1,5 +1,7 @@
 import type { BrowserContext, Page, Route } from '@playwright/test'
 import { IntegrationPage } from '../../pom/IntegrationPage'
+import { SearchPage } from '../../pom/SearchPage'
+import { SelectorPage } from '../../pom/SelectorPage'
 import { Toast } from '../../pom/Toast'
 import type { DaClient } from '../../setup/da-client'
 import { expect, test } from '../../setup/fixtures'
@@ -14,8 +16,10 @@ import { applyProfile } from '../../setup/profile'
  * A page showing the season apart from the title is matched by searching the
  * bare title and letting the season pick the result; DanDanPlay answers only
  * the bare keyword here. One result on season 2 mounts on its own and the
- * toast names it; two results on season 2 open the selector with both listed
- * ahead of the other seasons. Asserts toast text and the selector's card order.
+ * toast names it; two results on season 2 open the selector with both under
+ * "Likely" ahead of the other seasons, one click on a row mounts it, and
+ * "Search manually" opens the search with the bare title. Asserts toast text,
+ * the selector's groups and row order, and the search box.
  */
 
 const ORIGIN = 'https://da-test.invalid'
@@ -148,25 +152,84 @@ test('the only result on the page season mounts from a bare-title search', async
   expect(keywords).toEqual([SHOW])
 })
 
+const AMBIGUOUS_ANIMES: Anime[] = [
+  { animeId: 1001, animeTitle: SHOW },
+  { animeId: 1002, animeTitle: `${SHOW} 第二季` },
+  { animeId: 1003, animeTitle: `${SHOW} 3rd Season` },
+  { animeId: 1004, animeTitle: `${SHOW} Season 2` },
+]
+
 test('two results on the page season open the selector with them first', async ({
   context,
   page,
   da,
 }) => {
-  const { integrationPage } = await openSeasonPage(context, page, da, [
-    { animeId: 1001, animeTitle: SHOW },
-    { animeId: 1002, animeTitle: `${SHOW} 第二季` },
-    { animeId: 1003, animeTitle: `${SHOW} 3rd Season` },
-    { animeId: 1004, animeTitle: `${SHOW} Season 2` },
-  ])
+  const { integrationPage } = await openSeasonPage(
+    context,
+    page,
+    da,
+    AMBIGUOUS_ANIMES
+  )
 
   await expect(integrationPage.controllerWindow()).toBeVisible({
     timeout: 15_000,
   })
-  const cards = page.locator('[data-testid^="season-card-DanDanPlay-"]')
-  await expect(cards).toHaveCount(4)
-  await expect(cards.nth(0)).toContainText(`${SHOW} 第二季`)
-  await expect(cards.nth(1)).toContainText(`${SHOW} Season 2`)
-  await expect(cards.nth(2)).toContainText(/DA Integration Test$/)
-  await expect(cards.nth(3)).toContainText(`${SHOW} 3rd Season`)
+  const selector = new SelectorPage(page)
+  const rows = selector.options('DanDanPlay')
+  await expect(rows).toHaveCount(4)
+  await expect(selector.titleOf(rows.nth(0))).toHaveText(`${SHOW} 第二季`)
+  await expect(selector.titleOf(rows.nth(1))).toHaveText(`${SHOW} Season 2`)
+  await expect(selector.titleOf(rows.nth(2))).toHaveText(SHOW)
+  await expect(selector.titleOf(rows.nth(3))).toHaveText(`${SHOW} 3rd Season`)
+
+  await expect(selector.likelyGroup().locator(rows)).toHaveCount(2)
+  await expect(selector.othersGroup().locator(rows)).toHaveCount(2)
+  await expect(rows.nth(0)).toContainText(/Season 2|第2季/)
+  await expect(rows.nth(2)).toContainText(/Season 1|第1季/)
+})
+
+test('one click on a row mounts that season', async ({ context, page, da }) => {
+  const { integrationPage } = await openSeasonPage(
+    context,
+    page,
+    da,
+    AMBIGUOUS_ANIMES
+  )
+
+  await expect(integrationPage.controllerWindow()).toBeVisible({
+    timeout: 15_000,
+  })
+  const selector = new SelectorPage(page)
+  await selector.options('DanDanPlay').nth(1).click()
+
+  const toast = new Toast(page)
+  await toast.expectSuccess(
+    new RegExp(
+      `^(Mounted .*${SHOW} Season 2.*: 4 comments|已装填 .*${SHOW} Season 2.*：4 条弹幕)`
+    ),
+    { timeout: 15_000 }
+  )
+  await expect(integrationPage.controllerWindow()).toBeHidden()
+})
+
+test('"Search manually" opens the search with the bare title', async ({
+  context,
+  page,
+  da,
+}) => {
+  const { integrationPage } = await openSeasonPage(
+    context,
+    page,
+    da,
+    AMBIGUOUS_ANIMES
+  )
+
+  await expect(integrationPage.controllerWindow()).toBeVisible({
+    timeout: 15_000,
+  })
+  const selector = new SelectorPage(page)
+  await selector.searchManuallyButton().click()
+
+  const searchPage = new SearchPage(page)
+  await expect(searchPage.input).toHaveValue(SHOW)
 })

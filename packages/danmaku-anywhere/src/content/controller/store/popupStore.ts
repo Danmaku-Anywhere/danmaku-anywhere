@@ -28,6 +28,8 @@ export enum PopupTab {
 export interface SeasonOffer {
   label: string
   seasons: Season[]
+  // The season number the page shows, when it names one the parser can read.
+  pageSeason?: number
   apply: (season: Season) => Promise<void>
 }
 

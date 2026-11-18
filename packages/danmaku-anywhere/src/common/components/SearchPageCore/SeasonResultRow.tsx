@@ -25,7 +25,7 @@ const THUMB_SX = {
   borderRadius: 0.75,
 } as const
 
-function PosterThumb({ src, alt }: { src?: string; alt?: string }) {
+export function PosterThumb({ src, alt }: { src?: string; alt?: string }) {
   const image = useImage(src || IMAGE_ASSETS.Fallback)
 
   if (image.isPending || !image.data) {

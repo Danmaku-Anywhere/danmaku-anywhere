@@ -1,11 +1,25 @@
 import type { Season } from '@danmaku-anywhere/danmaku-model'
-import { Box, Button, Divider, Stack, Typography } from '@mui/material'
-import { useRef, useState } from 'react'
-import { useTranslation } from 'react-i18next'
-import { isPersistedSeason } from '@/common/anime/utils'
-import { SeasonGrid } from '@/common/components/Season/SeasonGrid'
-import { isCustomSeason } from '@/common/danmaku/utils'
+import { ChevronRight } from '@mui/icons-material'
 import {
+  alpha,
+  Box,
+  Button,
+  ButtonBase,
+  Chip,
+  CircularProgress,
+  Divider,
+  Stack,
+  Typography,
+} from '@mui/material'
+import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { rankBySeason, seasonNumberOf } from '@/common/anime/seasonRank'
+import { ScrollBox } from '@/common/components/layout/ScrollBox'
+import { TabLayout } from '@/common/components/layout/TabLayout'
+import { PosterThumb } from '@/common/components/SearchPageCore/SeasonResultRow'
+import { seasonProviderType } from '@/common/danmaku/utils'
+import {
+  PopupTab,
   type SeasonSelection,
   usePopup,
 } from '@/content/controller/store/popupStore'
@@ -32,94 +46,221 @@ export const SelectorPage = () => {
   return <SeasonSelector key={selection.id} selection={selection} />
 }
 
+interface SeasonGroups {
+  likely: Season[]
+  others: Season[]
+}
+
+function groupSeasons({ seasons, pageSeason }: SeasonSelection): SeasonGroups {
+  if (pageSeason === undefined) {
+    return { likely: [], others: seasons }
+  }
+  const { matches, others } = rankBySeason(seasons, pageSeason)
+  return { likely: matches, others }
+}
+
 function SeasonSelector({ selection }: { selection: SeasonSelection }) {
   const { t } = useTranslation()
+  const setTab = usePopup.use.setTab()
+  const triggerSearchFocus = usePopup.use.triggerSearchFocus()
 
-  const selectorBoxRef = useRef<HTMLDivElement>(undefined)
-  const [selectedSeason, setSelectedSeason] = useState<Season>()
-  const [applying, setApplying] = useState(false)
+  const [applying, setApplying] = useState<Season>()
 
-  const handleSeasonSelect = (season: Season) => {
-    setSelectedSeason(season)
-    selectorBoxRef.current?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'end',
-    })
+  const { likely, others } = groupSeasons(selection)
+
+  const handlePick = async (season: Season) => {
+    setApplying(season)
+    try {
+      await selection.apply(season)
+    } finally {
+      setApplying(undefined)
+    }
   }
 
-  const handleApply = async () => {
-    if (!selectedSeason) {
-      return
+  const handleSearchManually = () => {
+    setTab(PopupTab.Search)
+    triggerSearchFocus()
+  }
+
+  const renderOptions = (seasons: Season[], isLikely: boolean) => {
+    return seasons.map((season) => (
+      <SeasonOption
+        key={season.id}
+        season={season}
+        pageSeason={selection.pageSeason}
+        likely={isLikely}
+        applying={applying === season}
+        disabled={applying !== undefined}
+        onPick={handlePick}
+      />
+    ))
+  }
+
+  const renderGroups = () => {
+    if (likely.length === 0 || others.length === 0) {
+      return (
+        <Stack spacing={0.5} data-testid="selector-group-all">
+          {renderOptions([...likely, ...others], false)}
+        </Stack>
+      )
     }
-    setApplying(true)
-    try {
-      await selection.apply(selectedSeason)
-    } finally {
-      setApplying(false)
-    }
+    return (
+      <Stack spacing={2}>
+        <Stack spacing={0.5} data-testid="selector-group-likely">
+          <GroupHeading label={t('selectorPage.likely', 'Likely')} />
+          {renderOptions(likely, true)}
+        </Stack>
+        <Stack spacing={0.5} data-testid="selector-group-others">
+          <GroupHeading
+            label={t('selectorPage.otherResults', 'Other results')}
+          />
+          {renderOptions(others, false)}
+        </Stack>
+      </Stack>
+    )
   }
 
   return (
-    <Box
-      sx={{
-        flexGrow: 1,
-      }}
-    >
-      <Box
-        sx={{
-          p: 2,
-        }}
-      >
-        <Typography variant="body1">
+    <TabLayout>
+      <ScrollBox sx={{ flex: 1, minHeight: 0, overflow: 'auto', px: 2, py: 2 }}>
+        <Typography variant="h3">
+          {t('selectorPage.title', 'Which season is this?')}
+        </Typography>
+        <Typography
+          variant="body2"
+          sx={{ color: 'text.secondary', mt: 0.5, mb: 2 }}
+        >
           {t(
-            'selectorPage.selectAnime',
-            'Multiple matches found for {{name}}, please select',
+            'selectorPage.hint',
+            'Several seasons match {{name}}. Click one to load its danmaku.',
             { name: selection.label }
           )}
         </Typography>
-        <SeasonGrid
-          data={selection.seasons}
-          onSelectionChange={([season]) => {
-            if (!season) {
-              setSelectedSeason(undefined)
-              return
-            }
-            if (!isCustomSeason(season) && isPersistedSeason(season)) {
-              handleSeasonSelect(season)
-            }
-          }}
-          disableMenu
-          enableSelection
-          singleSelect
-        />
-      </Box>
+        {renderGroups()}
+      </ScrollBox>
       <Divider />
-      <Box
-        ref={selectorBoxRef}
+      <Stack
+        direction="row"
         sx={{
-          my: 2,
+          alignItems: 'center',
+          justifyContent: 'space-between',
           px: 2,
+          py: 1,
+          flexShrink: 0,
         }}
       >
-        <Stack
-          direction="column"
-          spacing={2}
+        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+          {t('selectorPage.notHere', 'Not here?')}
+        </Typography>
+        <Button
+          variant="text"
+          onClick={handleSearchManually}
+          data-testid="selector-search-manually"
+        >
+          {t('selectorPage.searchManually', 'Search manually')}
+        </Button>
+      </Stack>
+    </TabLayout>
+  )
+}
+
+function GroupHeading({ label }: { label: string }) {
+  return (
+    <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', pb: 0.5 }}>
+      <Typography variant="overline">{label}</Typography>
+      <Divider sx={{ flex: 1 }} />
+    </Stack>
+  )
+}
+
+interface SeasonOptionProps {
+  season: Season
+  pageSeason?: number
+  likely: boolean
+  applying: boolean
+  disabled: boolean
+  onPick: (season: Season) => void
+}
+
+function SeasonOption({
+  season,
+  pageSeason,
+  likely,
+  applying,
+  disabled,
+  onPick,
+}: SeasonOptionProps) {
+  const { t } = useTranslation()
+
+  const seasonNumber = seasonNumberOf(season)
+  const onPageSeason = seasonNumber === pageSeason
+  const testId = `selector-option-${seasonProviderType(season)}-${season.id}`
+
+  return (
+    <ButtonBase
+      onClick={() => onPick(season)}
+      disabled={disabled}
+      data-testid={testId}
+      sx={(theme) => ({
+        width: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1.25,
+        padding: '8px 10px',
+        borderRadius: 1.5,
+        textAlign: 'left',
+        bgcolor: likely ? alpha(theme.palette.primary.main, 0.08) : undefined,
+        '&:hover': {
+          bgcolor: likely
+            ? alpha(theme.palette.primary.main, 0.16)
+            : theme.palette.action.hover,
+        },
+        '&.Mui-focusVisible': { bgcolor: theme.palette.action.hover },
+        '&.Mui-disabled': { opacity: 0.7 },
+      })}
+    >
+      <PosterThumb src={season.imageUrl} alt={season.title} />
+      <Stack sx={{ flex: 1, minWidth: 0 }} spacing={0.75}>
+        <Typography
+          variant="body2"
+          title={season.title}
+          data-testid="selector-option-title"
           sx={{
-            alignItems: 'flex-start',
+            fontWeight: 600,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
           }}
         >
-          <Button
-            type="submit"
-            loading={applying}
-            variant="contained"
-            size="small"
-            onClick={handleApply}
-            disabled={!selectedSeason}
-          >
-            {t('common.apply', 'Apply')}
-          </Button>
+          {season.title}
+        </Typography>
+        <Stack
+          direction="row"
+          spacing={0.5}
+          useFlexGap
+          sx={{ flexWrap: 'wrap' }}
+        >
+          <Chip
+            label={t('anime.numericSeason', 'Season {{season}}', {
+              season: seasonNumber,
+            })}
+            color={onPageSeason ? 'primary' : 'default'}
+          />
+          {season.episodeCount !== undefined && (
+            <Chip
+              label={t('searchPage.epsCount', '{{count}} eps', {
+                count: season.episodeCount,
+              })}
+            />
+          )}
+          {season.year !== undefined && <Chip label={season.year} />}
         </Stack>
-      </Box>
-    </Box>
+      </Stack>
+      {applying ? (
+        <CircularProgress size={16} thickness={5} sx={{ flexShrink: 0 }} />
+      ) : (
+        <ChevronRight sx={{ color: 'text.secondary', flexShrink: 0 }} />
+      )}
+    </ButtonBase>
   )
 }
