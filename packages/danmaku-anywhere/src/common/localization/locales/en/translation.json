@@ -203,7 +203,6 @@
       "xmlExported": "Export XML successful",
       "xmlExportError": "Failed to export XML: {{message}}"
     },
-    "backup": "Export Backup",
     "commentContent": "Comment",
     "commentCounted_one": "{{count}} comment",
     "commentCounted_other": "{{count}} comments",

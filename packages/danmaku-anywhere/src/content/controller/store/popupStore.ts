@@ -14,8 +14,6 @@ export enum PopupTab {
   Mount = 'mount',
   Styles = 'styles',
   Policy = 'policy',
-  Import = 'import',
-  Filter = 'filter',
   TitleMapping = 'titleMapping',
 }
 

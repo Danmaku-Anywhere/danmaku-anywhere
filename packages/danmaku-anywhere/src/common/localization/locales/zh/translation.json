@@ -198,7 +198,6 @@
       "xmlExported": "导出XML成功",
       "xmlExportError": "导出XML失败：{{message}}"
     },
-    "backup": "导出备份",
     "commentContent": "弹幕内容",
     "commentCounted_other": "{{count}}条弹幕",
     "disable": "隐藏弹幕",
