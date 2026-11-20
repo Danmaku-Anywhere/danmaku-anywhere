@@ -3,6 +3,7 @@ import { tryCatchSync } from '@/common/utils/tryCatch'
 import { waitForBody } from '@/content/common/host/waitForBody'
 import { queryAllDeep } from '@/content/common/shadowDom/deepQuery'
 import { SHADOW_ROOT_ATTACHED_EVENT } from '@/content/common/shadowDom/shadowRootAttachedEvent'
+import { shadowRootOf } from '@/content/common/shadowDom/shadowRootOf'
 import { CONTROLLER_ROOT_ID } from '@/content/controller/common/constants/rootId'
 import { PLAYER_ROOT_ID } from '@/content/player/constants/rootId'
 import { VideoSrcObserver } from './VideoSrcObserver'
@@ -51,6 +52,7 @@ export class VideoNodeObserverService {
 
   private rootObs: MutationObserver
   private observedShadowRoots = new WeakSet<ShadowRoot>()
+  private shadowListeners = new AbortController()
   private srcObs = new VideoSrcObserver()
   private selector = 'video'
 
@@ -116,11 +118,7 @@ export class VideoNodeObserverService {
 
     const body = await waitForBody()
 
-    document.addEventListener(
-      SHADOW_ROOT_ATTACHED_EVENT,
-      this.handleShadowRootAttached,
-      true
-    )
+    this.listenForShadowRoots(document)
 
     const [, err] = tryCatchSync(() => this.scan(document))
     if (err) {
@@ -131,11 +129,8 @@ export class VideoNodeObserverService {
   }
 
   stop(): void {
-    document.removeEventListener(
-      SHADOW_ROOT_ATTACHED_EVENT,
-      this.handleShadowRootAttached,
-      true
-    )
+    this.shadowListeners.abort()
+    this.shadowListeners = new AbortController()
     this.rootObs.disconnect()
     this.observedShadowRoots = new WeakSet()
     this.srcObs.cleanup()
@@ -171,16 +166,26 @@ export class VideoNodeObserverService {
     }
     this.observedShadowRoots.add(root)
     this.observeRoot(root)
+    this.listenForShadowRoots(root)
+  }
+
+  private listenForShadowRoots(target: Document | ShadowRoot): void {
+    target.addEventListener(
+      SHADOW_ROOT_ATTACHED_EVENT,
+      this.handleShadowRootAttached,
+      { capture: true, signal: this.shadowListeners.signal }
+    )
   }
 
   private handleShadowRootAttached = (event: Event): void => {
-    const host = event.composedPath()[0] as Node | undefined
-    if (!host || !isElement(host)) {
+    const host = event.target
+    if (!(host instanceof Node) || !isElement(host) || isExtensionRoot(host)) {
       return
     }
-    if (host.shadowRoot && !isExtensionRoot(host)) {
-      this.observeShadowRoot(host.shadowRoot)
-      this.scan(host.shadowRoot)
+    const root = shadowRootOf(host)
+    if (root) {
+      this.observeShadowRoot(root)
+      this.scan(root)
     }
   }
 

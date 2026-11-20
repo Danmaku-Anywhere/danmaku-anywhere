@@ -1,3 +1,5 @@
+import { shadowRootOf } from './shadowDom/shadowRootOf'
+
 /**
  * When video becomes full screen, the popover (content script) will be visible on top of the video,
  * but will become "inert" and non-interactive.
@@ -24,9 +26,11 @@ export function reparentPopover(
     popover.hidePopover()
     popover.showPopover()
   } else {
-    // reparent to target and show the popover
-    if (popover.parentElement !== target) {
-      target.appendChild(popover)
+    // A shadow host only renders its shadow tree, so a light DOM child of a
+    // web component in fullscreen is not drawn at all.
+    const container = shadowRootOf(target) ?? target
+    if (popover.parentNode !== container) {
+      container.appendChild(popover)
     }
     popover.hidePopover()
     popover.showPopover()

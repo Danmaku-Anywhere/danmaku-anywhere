@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { getDeepFullscreenElement } from './deepFullscreenElement'
 
 function stubFullscreen(
@@ -39,6 +39,23 @@ describe('getDeepFullscreenElement', () => {
     stubFullscreen(document, outer)
     stubFullscreen(outerRoot, inner)
     stubFullscreen(innerRoot, player)
+
+    expect(getDeepFullscreenElement(document)).toBe(player)
+  })
+
+  it('follows a closed shadow root as well', () => {
+    const host = document.createElement('div')
+    const root = host.attachShadow({ mode: 'closed' })
+    const player = document.createElement('div')
+    root.append(player)
+    vi.spyOn(chrome.dom, 'openOrClosedShadowRoot').mockImplementation(
+      (element) => {
+        return element === host ? root : null
+      }
+    )
+
+    stubFullscreen(document, host)
+    stubFullscreen(root, player)
 
     expect(getDeepFullscreenElement(document)).toBe(player)
   })

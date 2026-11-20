@@ -12,6 +12,10 @@ delete (fakeBrowser.runtime as { getBackgroundPage?: unknown })
 // The extension holds the permissions API, so answering true is what it sees.
 fakeBrowser.permissions.contains = async () => true
 
+// The content scripts look up shadow roots through this on every scan. jsdom
+// cannot hand out closed roots, so tests that need one spy on it.
+fakeBrowser.dom.openOrClosedShadowRoot = (element) => element.shadowRoot
+
 // jsdom has no Web Locks. A test never has two upgrade services competing
 // for the lock, so granting each request straight away is enough.
 if (!('locks' in navigator)) {

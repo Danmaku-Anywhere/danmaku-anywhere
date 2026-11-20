@@ -177,7 +177,7 @@ describe('VideoNodeObserverService', () => {
 
       const root = host.attachShadow({ mode: 'open' })
       host.dispatchEvent(
-        new Event(SHADOW_ROOT_ATTACHED_EVENT, { bubbles: true, composed: true })
+        new Event(SHADOW_ROOT_ATTACHED_EVENT, { bubbles: true })
       )
       const video = makeVideo()
       root.appendChild(video)
@@ -221,11 +221,81 @@ describe('VideoNodeObserverService', () => {
 
       const root = host.attachShadow({ mode: 'open' })
       host.dispatchEvent(
-        new Event(SHADOW_ROOT_ATTACHED_EVENT, { bubbles: true, composed: true })
+        new Event(SHADOW_ROOT_ATTACHED_EVENT, { bubbles: true })
       )
       root.appendChild(makeVideo())
       await flush()
       expect(onChange).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('closed shadow roots', () => {
+    const closedRoots = new WeakMap<Element, ShadowRoot>()
+
+    function attachClosed(host: Element): ShadowRoot {
+      const root = host.attachShadow({ mode: 'closed' })
+      closedRoots.set(host, root)
+      return root
+    }
+
+    function announce(host: Element): void {
+      host.dispatchEvent(
+        new Event(SHADOW_ROOT_ATTACHED_EVENT, { bubbles: true })
+      )
+    }
+
+    beforeEach(() => {
+      vi.spyOn(chrome.dom, 'openOrClosedShadowRoot').mockImplementation(
+        (element) => {
+          return closedRoots.get(element) ?? null
+        }
+      )
+    })
+
+    it('finds a video already inside a closed root when start() is called', async () => {
+      const host = document.createElement('div')
+      const video = makeVideo()
+      attachClosed(host).appendChild(video)
+      container.appendChild(host)
+      const onChange = vi.fn()
+      service.addEventListener('videoNodeChange', onChange)
+      service.start('video')
+      await flush()
+      expect(onChange).toHaveBeenCalledWith(video)
+    })
+
+    it('hears a late root attached inside a closed root', async () => {
+      const outer = document.createElement('div')
+      const outerRoot = attachClosed(outer)
+      const inner = document.createElement('div')
+      outerRoot.appendChild(inner)
+      container.appendChild(outer)
+      service.start('video')
+      await flush()
+      const onChange = vi.fn()
+      service.addEventListener('videoNodeChange', onChange)
+
+      const innerRoot = attachClosed(inner)
+      announce(inner)
+      const video = makeVideo()
+      innerRoot.appendChild(video)
+      await flush()
+      expect(onChange).toHaveBeenCalledWith(video)
+    })
+
+    it('drops the video when a closed host is removed', async () => {
+      const host = document.createElement('div')
+      attachClosed(host).appendChild(makeVideo())
+      container.appendChild(host)
+      const onRemove = vi.fn()
+      service.addEventListener('videoNodeRemove', onRemove)
+      service.start('video')
+      await flush()
+
+      host.remove()
+      await flush()
+      vi.advanceTimersByTime(REMOVE_DEBOUNCE_MS)
+      expect(onRemove).toHaveBeenCalledTimes(1)
     })
   })
 

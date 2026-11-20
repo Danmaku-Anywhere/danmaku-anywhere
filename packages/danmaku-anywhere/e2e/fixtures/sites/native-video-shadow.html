@@ -1,12 +1,16 @@
 <!--
-  A web-component player: the <video> lives in the open shadow root of
+  A web-component player: the <video> lives in the shadow root of
   <da-shadow-player>, next to a button that puts the player wrapper inside the
   shadow root into fullscreen. Title and episode stay in the light DOM for the
   XPath integration.
 
-  The element is only defined when the spec calls window.upgradePlayer(), so
-  its shadow root is attached after the host is already in the page, the way a
-  late custom element upgrade does it.
+  The element is only defined when the spec calls
+  window.upgradePlayer(mode, fullscreenTarget), so its shadow root is attached
+  after the host is already in the page, the way a late custom element upgrade
+  does it. The mode picks an open or a closed root. The fullscreen target is
+  either the wrapper inside the root or the host element itself. The page keeps
+  its own references in window.shadowPlayer so the spec can drive a closed
+  player; the extension cannot see page globals.
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -19,16 +23,20 @@
     <span data-testid="da-episode">Episode 1</span>
     <da-shadow-player data-testid="da-shadow-host"></da-shadow-player>
     <script>
+      let rootMode = 'open'
+      let fullscreenOnHost = false
+
       class DaShadowPlayer extends HTMLElement {
         connectedCallback() {
-          if (this.shadowRoot) {
+          if (window.shadowPlayer) {
             return
           }
-          const root = this.attachShadow({ mode: 'open' })
+          const root = this.attachShadow({ mode: rootMode })
           root.innerHTML = `
             <style>
+              :host { display: block; }
               .player { position: relative; width: 640px; height: 360px; background: #000; }
-              .player:fullscreen { width: 100vw; height: 100vh; }
+              .player:fullscreen, :host(:fullscreen) .player { width: 100vw; height: 100vh; }
               video { width: 100%; height: 100%; display: block; }
             </style>
             <div class="player" data-testid="da-shadow-player">
@@ -36,14 +44,24 @@
             </div>
             <button type="button" data-testid="da-shadow-fullscreen">fullscreen player</button>
           `
-          root
-            .querySelector('[data-testid="da-shadow-fullscreen"]')
-            .addEventListener('click', () => {
-              void root.querySelector('.player').requestFullscreen()
-            })
+          const player = root.querySelector('.player')
+          const button = root.querySelector('button')
+          const fullscreenTarget = fullscreenOnHost ? this : player
+          button.addEventListener('click', () => {
+            void fullscreenTarget.requestFullscreen()
+          })
+          window.shadowPlayer = {
+            root,
+            player,
+            button,
+            fullscreenTarget,
+            video: root.querySelector('video'),
+          }
         }
       }
-      window.upgradePlayer = () => {
+      window.upgradePlayer = (mode, fullscreenTarget) => {
+        rootMode = mode
+        fullscreenOnHost = fullscreenTarget === 'host'
         customElements.define('da-shadow-player', DaShadowPlayer)
       }
     </script>

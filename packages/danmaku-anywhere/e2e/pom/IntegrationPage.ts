@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { Frame, Locator, Page } from '@playwright/test'
+import type { ElementHandle, Frame, Locator, Page } from '@playwright/test'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const SITES_ROOT = path.join(__dirname, '..', 'fixtures', 'sites')
@@ -12,9 +12,25 @@ export interface OpenOptions {
   extraFixtures?: Record<string, string>
 }
 
+type BoundingBox = Awaited<ReturnType<Locator['boundingBox']>>
+
+export type ShadowPlayerFullscreenTarget = 'inner' | 'host'
+
+// What native-video-shadow.html keeps on window once its player is upgraded.
+interface ShadowPlayerWindow {
+  shadowPlayer: {
+    root: ShadowRoot
+    player: HTMLElement
+    fullscreenTarget: HTMLElement
+    video: HTMLVideoElement
+    button: HTMLButtonElement
+  }
+}
+
 export class IntegrationPage {
   private videoFrame: Frame | null = null
   private iframeSelector: string | null = null
+  private closedShadowPlayer = false
 
   constructor(private readonly page: Page) {}
 
@@ -25,6 +41,7 @@ export class IntegrationPage {
   ): Promise<void> {
     this.videoFrame = null
     this.iframeSelector = null
+    this.closedShadowPlayer = false
 
     const html = readFileSync(path.join(SITES_ROOT, fixtureFile), 'utf-8')
     await this.page.route(url, async (route) => {
@@ -123,28 +140,91 @@ export class IntegrationPage {
 
   // native-video-shadow.html defines its player element on demand, so the
   // shadow root holding the video is attached to a host already in the page.
-  async upgradeShadowPlayer(): Promise<void> {
-    await this.page.evaluate(() => {
-      const fixture = window as unknown as { upgradePlayer?: () => void }
-      if (!fixture.upgradePlayer) {
-        throw new Error(
-          'IntegrationPage.upgradeShadowPlayer: fixture has no upgradePlayer()'
-        )
-      }
-      fixture.upgradePlayer()
+  // Locators cannot reach into a closed root, so after a closed upgrade the
+  // video methods go through the element handle the fixture keeps on window.
+  async upgradeShadowPlayer(
+    mode: ShadowRootMode = 'open',
+    fullscreenTarget: ShadowPlayerFullscreenTarget = 'inner'
+  ): Promise<void> {
+    await this.page.evaluate(
+      ([rootMode, target]) => {
+        const fixture = window as unknown as {
+          upgradePlayer?: (
+            mode: ShadowRootMode,
+            fullscreenTarget: ShadowPlayerFullscreenTarget
+          ) => void
+        }
+        if (!fixture.upgradePlayer) {
+          throw new Error(
+            'IntegrationPage.upgradeShadowPlayer: fixture has no upgradePlayer()'
+          )
+        }
+        fixture.upgradePlayer(rootMode, target)
+      },
+      [mode, fullscreenTarget] as const
+    )
+    this.closedShadowPlayer = mode === 'closed'
+  }
+
+  // An element in fullscreen inside the host's shadow root is only reported
+  // by that root; document.fullscreenElement says the host.
+  async enterShadowPlayerFullscreen(): Promise<void> {
+    const button = await this.shadowPlayerPart('button')
+    await button.click()
+    await this.page.waitForFunction(() => {
+      const { shadowPlayer } = window as unknown as ShadowPlayerWindow
+      const target = shadowPlayer.fullscreenTarget
+      return (
+        document.fullscreenElement === target ||
+        shadowPlayer.root.fullscreenElement === target
+      )
     })
   }
 
-  // The element in fullscreen sits inside the host's shadow root, so
-  // document.fullscreenElement only reports the host.
-  async enterShadowPlayerFullscreen(): Promise<void> {
-    await this.page.getByTestId('da-shadow-fullscreen').click()
-    await this.page.waitForFunction(
-      () =>
-        document.fullscreenElement?.shadowRoot?.fullscreenElement?.getAttribute(
-          'data-testid'
-        ) === 'da-shadow-player'
-    )
+  // In fullscreen the overlay is moved into the shadow tree of the player,
+  // which for a closed root is out of reach of locators.
+  async overlayBoxInShadowFullscreen(
+    selector: '[data-danmu-container]' | '.da-danmaku'
+  ): Promise<BoundingBox | null> {
+    const handle = await this.page.evaluateHandle((sel) => {
+      const { shadowPlayer } = window as unknown as ShadowPlayerWindow
+      const overlay = shadowPlayer.root.querySelector(
+        '#danmaku-anywhere-player'
+      )
+      return (
+        overlay?.querySelector(sel) ??
+        overlay?.shadowRoot?.querySelector(sel) ??
+        null
+      )
+    }, selector)
+    const element = handle.asElement()
+    if (!element) {
+      return null
+    }
+    return element.boundingBox()
+  }
+
+  private async shadowPlayerPart(
+    part: 'video' | 'button'
+  ): Promise<ElementHandle<HTMLElement>> {
+    const handle = await this.page.evaluateHandle((name) => {
+      const { shadowPlayer } = window as unknown as ShadowPlayerWindow
+      return shadowPlayer[name]
+    }, part)
+    return handle as ElementHandle<HTMLElement>
+  }
+
+  private async videoHandle(): Promise<ElementHandle<HTMLVideoElement>> {
+    if (this.closedShadowPlayer) {
+      return (await this.shadowPlayerPart(
+        'video'
+      )) as ElementHandle<HTMLVideoElement>
+    }
+    return (await this.video().elementHandle()) as ElementHandle<HTMLVideoElement>
+  }
+
+  async videoBox(): Promise<BoundingBox | null> {
+    return (await this.videoHandle()).boundingBox()
   }
 
   // Outside an element in fullscreen the page is inert, and an inert button
@@ -183,8 +263,8 @@ export class IntegrationPage {
   // A bare <video> won't fire seek events on its own; synthesize them.
   async setVideoTime(seconds: number): Promise<void> {
     await this.forceVisible()
-    await this.video().evaluate((element, t) => {
-      const v = element as HTMLVideoElement
+    const video = await this.videoHandle()
+    await video.evaluate((v, t) => {
       v.currentTime = t
       v.dispatchEvent(new Event('seeking'))
       v.dispatchEvent(new Event('timeupdate'))
@@ -194,7 +274,8 @@ export class IntegrationPage {
   // .play() is a no-op on a src-less <video>; synthesize the events directly.
   async playVideo(): Promise<void> {
     await this.forceVisible()
-    await this.video().evaluate((v) => {
+    const video = await this.videoHandle()
+    await video.evaluate((v) => {
       v.dispatchEvent(new Event('play'))
       v.dispatchEvent(new Event('playing'))
     })
@@ -223,7 +304,7 @@ export class IntegrationPage {
   // Pointer activity over the video is what wakes the in-player overlays. A
   // corner is used because the info panel may cover the video's center.
   async movePointerOverVideo(): Promise<void> {
-    const box = await this.video().boundingBox()
+    const box = await this.videoBox()
     if (!box) {
       throw new Error(
         'IntegrationPage.movePointerOverVideo: video not laid out'
@@ -237,7 +318,8 @@ export class IntegrationPage {
   }
 
   async pauseVideo(): Promise<void> {
-    await this.video().evaluate((v) => {
+    const video = await this.videoHandle()
+    await video.evaluate((v) => {
       v.dispatchEvent(new Event('pause'))
     })
   }

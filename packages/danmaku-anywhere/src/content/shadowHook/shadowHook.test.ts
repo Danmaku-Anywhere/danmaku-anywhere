@@ -1,31 +1,44 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SHADOW_ROOT_ATTACHED_EVENT } from '@/content/common/shadowDom/shadowRootAttachedEvent'
 import './index.iife'
 
+afterEach(() => {
+  document.body.replaceChildren()
+})
+
 describe('attachShadow hook', () => {
-  it('announces an open root from its host, reaching document listeners', () => {
-    const listener = vi.fn((event: Event) => event.composedPath()[0])
+  it.each([
+    'open',
+    'closed',
+  ] as const)('announces a %s root from its host to the host tree', (mode) => {
+    const listener = vi.fn((event: Event) => event.target)
     document.addEventListener(SHADOW_ROOT_ATTACHED_EVENT, listener, true)
     const host = document.createElement('div')
     document.body.append(host)
 
-    const root = host.attachShadow({ mode: 'open' })
+    const root = host.attachShadow({ mode })
 
-    expect(root).toBe(host.shadowRoot)
+    expect(root.mode).toBe(mode)
     expect(listener).toHaveBeenCalledTimes(1)
     expect(listener.mock.results[0].value).toBe(host)
     document.removeEventListener(SHADOW_ROOT_ATTACHED_EVENT, listener, true)
   })
 
-  it('stays silent for closed roots', () => {
-    const listener = vi.fn()
-    document.addEventListener(SHADOW_ROOT_ATTACHED_EVENT, listener, true)
-    const host = document.createElement('div')
-    document.body.append(host)
+  it('does not leave the shadow root the host sits in', () => {
+    const outer = document.createElement('div')
+    const outerRoot = outer.attachShadow({ mode: 'closed' })
+    document.body.append(outer)
+    const inner = document.createElement('div')
+    outerRoot.append(inner)
+    const onDocument = vi.fn()
+    const onOuterRoot = vi.fn((event: Event) => event.target)
+    document.addEventListener(SHADOW_ROOT_ATTACHED_EVENT, onDocument, true)
+    outerRoot.addEventListener(SHADOW_ROOT_ATTACHED_EVENT, onOuterRoot, true)
 
-    host.attachShadow({ mode: 'closed' })
+    inner.attachShadow({ mode: 'closed' })
 
-    expect(listener).not.toHaveBeenCalled()
-    document.removeEventListener(SHADOW_ROOT_ATTACHED_EVENT, listener, true)
+    expect(onOuterRoot.mock.results[0]?.value).toBe(inner)
+    expect(onDocument).not.toHaveBeenCalled()
+    document.removeEventListener(SHADOW_ROOT_ATTACHED_EVENT, onDocument, true)
   })
 })

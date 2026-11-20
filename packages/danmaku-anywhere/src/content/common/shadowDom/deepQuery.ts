@@ -1,3 +1,5 @@
+import { shadowRootOf } from './shadowRootOf'
+
 export type ShadowHostFilter = (host: Element) => boolean
 
 export interface DeepQueryResult<T extends Element> {
@@ -39,7 +41,7 @@ function collectFrom<T extends Element>(
   }
 
   for (const host of hosts) {
-    const root = host.shadowRoot
+    const root = shadowRootOf(host)
     if (!root || skipHost(host)) {
       continue
     }
@@ -49,10 +51,11 @@ function collectFrom<T extends Element>(
 }
 
 /**
- * Like querySelectorAll, but also searches every open shadow root under
- * `scope`, at any depth. The selector is matched inside each root on its own,
- * so it cannot span a shadow boundary. An element scope is matched against the
- * selector itself as well, and its own shadow root is searched.
+ * Like querySelectorAll, but also searches every shadow root under `scope`
+ * that shadowRootOf can reach, at any depth. The selector is matched inside
+ * each root on its own, so it cannot span a shadow boundary. An element scope
+ * is matched against the selector itself as well, and its own shadow root is
+ * searched.
  */
 export function queryAllDeep<T extends Element>(
   scope: QueryScope,
