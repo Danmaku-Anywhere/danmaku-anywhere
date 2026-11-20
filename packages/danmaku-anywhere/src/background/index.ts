@@ -30,7 +30,8 @@ configureApiStore({
 
 container.get(OptionsManager).setup()
 container.get(UpgradeFailureBadge).setup()
-container.get(ScriptingManager).setup()
+const scriptingManager: ScriptingManager = container.get(ScriptingManager)
+scriptingManager.setup()
 container.get(MountConfigTabReloader).setup()
 container.get(RpcManager).setup()
 container.get(NetRequestManager).setup()
