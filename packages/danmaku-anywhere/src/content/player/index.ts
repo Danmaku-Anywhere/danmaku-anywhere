@@ -4,5 +4,5 @@ import { PlayerScript } from '@/content/player/PlayerScript.service'
 
 const { data: frameId } = await chromeRpcClient.getFrameId()
 bootstrapUiLanguage(uiContainer)
-const player = uiContainer.get(PlayerScript)
+const player: PlayerScript = uiContainer.get(PlayerScript)
 player.setup(frameId)

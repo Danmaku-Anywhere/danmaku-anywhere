@@ -317,13 +317,6 @@ export class IntegrationPage {
     await this.page.mouse.move(0, 0)
   }
 
-  async pauseVideo(): Promise<void> {
-    const video = await this.videoHandle()
-    await video.evaluate((v) => {
-      v.dispatchEvent(new Event('pause'))
-    })
-  }
-
   // Rendered danmaku nodes inside the player's (open) shadow root. For
   // iframe scenarios the renderer mounts in the iframe's document.
   commentElements(): Locator {

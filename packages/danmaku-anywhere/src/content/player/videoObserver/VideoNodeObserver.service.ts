@@ -102,13 +102,6 @@ export class VideoNodeObserverService {
     this.eventListeners.get(event)!.add(listener)
   }
 
-  removeEventListener(
-    event: VideoNodeObserverEvent,
-    listener: VideoChangeListener
-  ): void {
-    this.eventListeners.get(event)?.delete(listener)
-  }
-
   /**
    * Begin observing the DOM for video elements matching selector.
    * Waits for document.body if called at document_start in an iframe.

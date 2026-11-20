@@ -82,7 +82,7 @@ export class PlayerScript {
     query: string,
     session: ControllerSession
   ) {
-    const handler = uiContainer.get(PlayerCommandHandler)
+    const handler: PlayerCommandHandler = uiContainer.get(PlayerCommandHandler)
     await handler.start({
       frameId: this.frameId,
       query,
