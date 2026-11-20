@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 /// <reference types="urlpattern-polyfill" />
+/// <reference types="@crxjs/vite-plugin/client" />
 interface ImportMetaEnv {
   readonly VITE_PROXY_URL: string
   readonly VITE_PROXY_ORIGIN: string

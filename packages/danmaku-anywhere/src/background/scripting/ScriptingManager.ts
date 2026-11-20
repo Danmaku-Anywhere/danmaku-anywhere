@@ -4,9 +4,7 @@ import type { MountConfig } from '@/common/options/mountConfig/schema'
 import { MountConfigService } from '@/common/options/mountConfig/service'
 import { createTaskQueue } from '@/common/utils/taskQueue'
 // the ?script query is used to get the file path for the script after bundling
-// @ts-expect-error
 import contentScript from '@/content/controller?script'
-// @ts-expect-error
 import shadowHookScript from '@/content/shadowHook/index.iife?script'
 
 export const MAIN_CONTENT_SCRIPT_ID = 'main-content'
