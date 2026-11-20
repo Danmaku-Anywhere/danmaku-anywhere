@@ -57,13 +57,6 @@ export const manifest = defineManifest({
       all_frames: true,
       // isolated world by default
     },
-    {
-      matches: ['<all_urls>'],
-      js: ['src/content/shadowHook/index.iife.ts'],
-      run_at: 'document_start',
-      all_frames: true,
-      world: 'MAIN',
-    },
   ],
   permissions,
   host_permissions: ['https://*/*', 'http://*/*', 'file:///*'],

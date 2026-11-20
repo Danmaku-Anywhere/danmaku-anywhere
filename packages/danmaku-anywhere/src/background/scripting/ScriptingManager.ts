@@ -6,8 +6,11 @@ import { createTaskQueue } from '@/common/utils/taskQueue'
 // the ?script query is used to get the file path for the script after bundling
 // @ts-expect-error
 import contentScript from '@/content/controller?script'
+// @ts-expect-error
+import shadowHookScript from '@/content/shadowHook/index.iife?script'
 
 export const MAIN_CONTENT_SCRIPT_ID = 'main-content'
+export const SHADOW_HOOK_SCRIPT_ID = 'shadow-hook'
 
 const mainScript: chrome.scripting.RegisteredContentScript = {
   id: MAIN_CONTENT_SCRIPT_ID,
@@ -18,6 +21,20 @@ const mainScript: chrome.scripting.RegisteredContentScript = {
   runAt: 'document_idle',
   world: 'ISOLATED',
 }
+
+// Reports the page's attachShadow calls to the video observer. It patches a
+// page global, so it only goes where the extension is mounted.
+const shadowHook: chrome.scripting.RegisteredContentScript = {
+  id: SHADOW_HOOK_SCRIPT_ID,
+  js: [shadowHookScript],
+  matches: [],
+  persistAcrossSessions: true,
+  allFrames: true,
+  runAt: 'document_start',
+  world: 'MAIN',
+}
+
+const scripts = [mainScript, shadowHook]
 
 const q = createTaskQueue()
 
@@ -55,38 +72,40 @@ export class ScriptingManager {
       .map((config) => config.patterns)
       .flat()
 
-    const registeredScript = await chrome.scripting.getRegisteredContentScripts(
-      {
-        ids: [MAIN_CONTENT_SCRIPT_ID],
+    const registered = await chrome.scripting.getRegisteredContentScripts({
+      ids: scripts.map((script) => script.id),
+    })
+    const registeredIds = new Set(registered.map((script) => script.id))
+
+    if (patterns.length === 0) {
+      if (registeredIds.size > 0) {
+        this.logger.debug('Unregistering content scripts', { patterns })
+        await chrome.scripting.unregisterContentScripts({
+          ids: [...registeredIds],
+        })
       }
-    )
-
-    if (patterns.length === 0 && registeredScript.length > 0) {
-      this.logger.debug('Unregistering content scripts', { patterns })
-      return chrome.scripting.unregisterContentScripts({
-        ids: [MAIN_CONTENT_SCRIPT_ID],
-      })
+      return
     }
 
-    if (patterns.length > 0 && registeredScript.length === 0) {
+    const toUpdate = scripts.filter((script) => registeredIds.has(script.id))
+    const toRegister = scripts.filter((script) => !registeredIds.has(script.id))
+
+    if (toRegister.length > 0) {
       this.logger.debug('Registering content scripts', { patterns })
-      return chrome.scripting.registerContentScripts([
-        {
-          ...mainScript,
-          matches: patterns,
-        },
-      ])
+      await chrome.scripting.registerContentScripts(
+        toRegister.map((script) => {
+          return { ...script, matches: patterns }
+        })
+      )
     }
 
-    if (patterns.length > 0 && registeredScript.length > 0) {
+    if (toUpdate.length > 0) {
       this.logger.debug('Updating content scripts', { patterns })
-      return chrome.scripting.updateContentScripts([
-        {
-          id: MAIN_CONTENT_SCRIPT_ID,
-          js: [contentScript],
-          matches: patterns,
-        },
-      ])
+      await chrome.scripting.updateContentScripts(
+        toUpdate.map((script) => {
+          return { ...script, matches: patterns }
+        })
+      )
     }
   }
 }

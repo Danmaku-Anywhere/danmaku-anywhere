@@ -41,4 +41,25 @@ describe('attachShadow hook', () => {
     expect(onDocument).not.toHaveBeenCalled()
     document.removeEventListener(SHADOW_ROOT_ATTACHED_EVENT, onDocument, true)
   })
+
+  it('still attaches when the page later breaks Event and dispatchEvent', () => {
+    const listener = vi.fn()
+    document.addEventListener(SHADOW_ROOT_ATTACHED_EVENT, listener, true)
+    const pageDispatch = vi
+      .spyOn(EventTarget.prototype, 'dispatchEvent')
+      .mockImplementation(() => {
+        throw new Error('page override')
+      })
+    vi.stubGlobal('Event', undefined)
+    const host = document.createElement('div')
+    document.body.append(host)
+
+    const root = host.attachShadow({ mode: 'open' })
+
+    expect(host.shadowRoot).toBe(root)
+    expect(listener).toHaveBeenCalledTimes(1)
+    vi.unstubAllGlobals()
+    pageDispatch.mockRestore()
+    document.removeEventListener(SHADOW_ROOT_ATTACHED_EVENT, listener, true)
+  })
 })
