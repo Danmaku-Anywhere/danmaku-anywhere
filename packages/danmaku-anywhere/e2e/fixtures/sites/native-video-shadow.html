@@ -1,0 +1,51 @@
+<!--
+  A web-component player: the <video> lives in the open shadow root of
+  <da-shadow-player>, next to a button that puts the player wrapper inside the
+  shadow root into fullscreen. Title and episode stay in the light DOM for the
+  XPath integration.
+
+  The element is only defined when the spec calls window.upgradePlayer(), so
+  its shadow root is attached after the host is already in the page, the way a
+  late custom element upgrade does it.
+-->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Integration test page</title>
+  </head>
+  <body>
+    <h1 data-testid="da-title">DA Integration Test</h1>
+    <span data-testid="da-episode">Episode 1</span>
+    <da-shadow-player data-testid="da-shadow-host"></da-shadow-player>
+    <script>
+      class DaShadowPlayer extends HTMLElement {
+        connectedCallback() {
+          if (this.shadowRoot) {
+            return
+          }
+          const root = this.attachShadow({ mode: 'open' })
+          root.innerHTML = `
+            <style>
+              .player { position: relative; width: 640px; height: 360px; background: #000; }
+              .player:fullscreen { width: 100vw; height: 100vh; }
+              video { width: 100%; height: 100%; display: block; }
+            </style>
+            <div class="player" data-testid="da-shadow-player">
+              <video data-testid="da-video" playsinline></video>
+            </div>
+            <button type="button" data-testid="da-shadow-fullscreen">fullscreen player</button>
+          `
+          root
+            .querySelector('[data-testid="da-shadow-fullscreen"]')
+            .addEventListener('click', () => {
+              void root.querySelector('.player').requestFullscreen()
+            })
+        }
+      }
+      window.upgradePlayer = () => {
+        customElements.define('da-shadow-player', DaShadowPlayer)
+      }
+    </script>
+  </body>
+</html>

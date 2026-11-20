@@ -121,6 +121,32 @@ export class IntegrationPage {
     )
   }
 
+  // native-video-shadow.html defines its player element on demand, so the
+  // shadow root holding the video is attached to a host already in the page.
+  async upgradeShadowPlayer(): Promise<void> {
+    await this.page.evaluate(() => {
+      const fixture = window as unknown as { upgradePlayer?: () => void }
+      if (!fixture.upgradePlayer) {
+        throw new Error(
+          'IntegrationPage.upgradeShadowPlayer: fixture has no upgradePlayer()'
+        )
+      }
+      fixture.upgradePlayer()
+    })
+  }
+
+  // The element in fullscreen sits inside the host's shadow root, so
+  // document.fullscreenElement only reports the host.
+  async enterShadowPlayerFullscreen(): Promise<void> {
+    await this.page.getByTestId('da-shadow-fullscreen').click()
+    await this.page.waitForFunction(
+      () =>
+        document.fullscreenElement?.shadowRoot?.fullscreenElement?.getAttribute(
+          'data-testid'
+        ) === 'da-shadow-player'
+    )
+  }
+
   // Outside an element in fullscreen the page is inert, and an inert button
   // drops out of the accessibility tree while still being drawn.
   floatingButton({ includeInert = false } = {}): Locator {
@@ -144,16 +170,21 @@ export class IntegrationPage {
     return this.videoFrame ?? this.page
   }
 
+  // Locators pierce open shadow roots, so this also finds a <video> that a
+  // web component keeps in its shadow tree.
+  video(): Locator {
+    const selector = 'video[data-testid="da-video"]'
+    if (this.iframeSelector) {
+      return this.page.frameLocator(this.iframeSelector).locator(selector)
+    }
+    return this.page.locator(selector)
+  }
+
   // A bare <video> won't fire seek events on its own; synthesize them.
   async setVideoTime(seconds: number): Promise<void> {
     await this.forceVisible()
-    await this.target.evaluate((t) => {
-      const v = document.querySelector(
-        'video[data-testid="da-video"]'
-      ) as HTMLVideoElement | null
-      if (!v) {
-        throw new Error('IntegrationPage.setVideoTime: no <video> element')
-      }
+    await this.video().evaluate((element, t) => {
+      const v = element as HTMLVideoElement
       v.currentTime = t
       v.dispatchEvent(new Event('seeking'))
       v.dispatchEvent(new Event('timeupdate'))
@@ -163,13 +194,7 @@ export class IntegrationPage {
   // .play() is a no-op on a src-less <video>; synthesize the events directly.
   async playVideo(): Promise<void> {
     await this.forceVisible()
-    await this.target.evaluate(() => {
-      const v = document.querySelector(
-        'video[data-testid="da-video"]'
-      ) as HTMLVideoElement | null
-      if (!v) {
-        throw new Error('IntegrationPage.playVideo: no <video> element')
-      }
+    await this.video().evaluate((v) => {
       v.dispatchEvent(new Event('play'))
       v.dispatchEvent(new Event('playing'))
     })
@@ -198,11 +223,7 @@ export class IntegrationPage {
   // Pointer activity over the video is what wakes the in-player overlays. A
   // corner is used because the info panel may cover the video's center.
   async movePointerOverVideo(): Promise<void> {
-    const selector = 'video[data-testid="da-video"]'
-    const video = this.iframeSelector
-      ? this.page.frameLocator(this.iframeSelector).locator(selector)
-      : this.page.locator(selector)
-    const box = await video.boundingBox()
+    const box = await this.video().boundingBox()
     if (!box) {
       throw new Error(
         'IntegrationPage.movePointerOverVideo: video not laid out'
@@ -216,13 +237,7 @@ export class IntegrationPage {
   }
 
   async pauseVideo(): Promise<void> {
-    await this.target.evaluate(() => {
-      const v = document.querySelector(
-        'video[data-testid="da-video"]'
-      ) as HTMLVideoElement | null
-      if (!v) {
-        throw new Error('IntegrationPage.pauseVideo: no <video> element')
-      }
+    await this.video().evaluate((v) => {
       v.dispatchEvent(new Event('pause'))
     })
   }

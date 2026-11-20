@@ -12,6 +12,7 @@ import type {
   VideoInfo,
 } from '@/common/rpcClient/background/types'
 import { reparentPopover } from '@/content/common/reparentPopover'
+import { getDeepFullscreenElement } from '@/content/common/shadowDom/deepFullscreenElement'
 import { CONTROLLER_ROOT_ID } from '@/content/controller/common/constants/rootId'
 import { useActiveConfig } from '@/content/controller/common/context/useActiveConfig'
 import {
@@ -128,7 +129,7 @@ export const FrameManager = () => {
     reparentPopover(
       root,
       document,
-      enableFullscreenInteraction ? document.fullscreenElement : null
+      enableFullscreenInteraction ? getDeepFullscreenElement(document) : null
     )
   })
 

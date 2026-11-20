@@ -30,6 +30,7 @@ import { VideoEventService } from '@/content/player/videoEvent/VideoEvent.servic
 import { VideoNodeObserverService } from '@/content/player/videoObserver/VideoNodeObserver.service'
 import { VideoSkipService } from '@/content/player/videoSkip/VideoSkip.service'
 import { reparentPopover } from '../common/reparentPopover'
+import { getDeepFullscreenElement } from '../common/shadowDom/deepFullscreenElement'
 
 interface StartContext {
   frameId: number
@@ -221,7 +222,7 @@ export class PlayerCommandHandler {
   private wireWindowEvents() {
     document.addEventListener('fullscreenchange', () => {
       if (this.enableFullscreenInteraction) {
-        reparentPopover(this.root, document, document.fullscreenElement)
+        reparentPopover(this.root, document, getDeepFullscreenElement(document))
       } else {
         reparentPopover(this.root, document, null)
       }

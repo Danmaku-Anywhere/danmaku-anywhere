@@ -1,3 +1,5 @@
+import { containsComposed } from '@/content/common/shadowDom/deepQuery'
+
 /**
  * Tracks video elements currently in the DOM and manages play/pause listeners
  * on each. Provides priority-based selection of the "best" active video.
@@ -42,9 +44,12 @@ export class VideoStack {
     return true
   }
 
-  /** Returns a snapshot of tracked videos contained within the given element. */
+  /**
+   * Returns a snapshot of tracked videos contained within the given element,
+   * including those inside shadow roots under it.
+   */
   within(element: Element): HTMLVideoElement[] {
-    return this.videos.filter((v) => element.contains(v))
+    return this.videos.filter((v) => containsComposed(element, v))
   }
 
   /**

@@ -1,6 +1,10 @@
 import { injectable } from 'inversify'
 import { tryCatchSync } from '@/common/utils/tryCatch'
 import { waitForBody } from '@/content/common/host/waitForBody'
+import { queryAllDeep } from '@/content/common/shadowDom/deepQuery'
+import { SHADOW_ROOT_ATTACHED_EVENT } from '@/content/common/shadowDom/shadowRootAttachedEvent'
+import { CONTROLLER_ROOT_ID } from '@/content/controller/common/constants/rootId'
+import { PLAYER_ROOT_ID } from '@/content/player/constants/rootId'
 import { VideoSrcObserver } from './VideoSrcObserver'
 import { VideoStack } from './VideoStack'
 
@@ -12,6 +16,12 @@ const isVideoElement = (node: Node): node is HTMLVideoElement => {
 
 const isElement = (node: Node): node is Element => {
   return node.nodeType === Node.ELEMENT_NODE
+}
+
+// The extension's own UI roots are open in e2e builds and hold no page video,
+// but their shadow trees change on every rendered comment.
+function isExtensionRoot(host: Element): boolean {
+  return host.id === PLAYER_ROOT_ID || host.id === CONTROLLER_ROOT_ID
 }
 
 export type VideoChangeListener = (video: HTMLVideoElement) => void
@@ -40,6 +50,7 @@ export class VideoNodeObserverService {
   private lastChangeTime = new WeakMap<HTMLVideoElement, number>()
 
   private rootObs: MutationObserver
+  private observedShadowRoots = new WeakSet<ShadowRoot>()
   private srcObs = new VideoSrcObserver()
   private selector = 'video'
 
@@ -52,12 +63,8 @@ export class VideoNodeObserverService {
     this.rootObs = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         for (const node of mutation.addedNodes) {
-          if (isVideoElement(node) && node.matches(this.selector)) {
-            this.handleAdded(node)
-          } else if (isElement(node)) {
-            node
-              .querySelectorAll<HTMLVideoElement>(this.selector)
-              .forEach((v) => this.handleAdded(v))
+          if (isElement(node)) {
+            this.scan(node)
           }
         }
 
@@ -109,19 +116,28 @@ export class VideoNodeObserverService {
 
     const body = await waitForBody()
 
-    const [existing, err] = tryCatchSync(() =>
-      document.querySelectorAll<HTMLVideoElement>(this.selector)
+    document.addEventListener(
+      SHADOW_ROOT_ATTACHED_EVENT,
+      this.handleShadowRootAttached,
+      true
     )
+
+    const [, err] = tryCatchSync(() => this.scan(document))
     if (err) {
       throw new Error(`Error selecting video element: ${err.message}`)
     }
-    existing?.forEach((v) => this.handleAdded(v))
 
     this.observeRoot(body)
   }
 
   stop(): void {
+    document.removeEventListener(
+      SHADOW_ROOT_ATTACHED_EVENT,
+      this.handleShadowRootAttached,
+      true
+    )
     this.rootObs.disconnect()
+    this.observedShadowRoots = new WeakSet()
     this.srcObs.cleanup()
     this.eventListeners.clear()
     if (this.state.type === 'removing') clearTimeout(this.state.timerId)
@@ -131,6 +147,41 @@ export class VideoNodeObserverService {
 
   private observeRoot(root: Node): void {
     this.rootObs.observe(root, { childList: true, subtree: true })
+  }
+
+  private scan(scope: Element | Document | ShadowRoot): void {
+    const { matches, shadowRoots } = queryAllDeep<HTMLVideoElement>(
+      scope,
+      this.selector,
+      isExtensionRoot
+    )
+    for (const root of shadowRoots) {
+      this.observeShadowRoot(root)
+    }
+    for (const video of matches) {
+      if (isVideoElement(video)) {
+        this.handleAdded(video)
+      }
+    }
+  }
+
+  private observeShadowRoot(root: ShadowRoot): void {
+    if (this.observedShadowRoots.has(root)) {
+      return
+    }
+    this.observedShadowRoots.add(root)
+    this.observeRoot(root)
+  }
+
+  private handleShadowRootAttached = (event: Event): void => {
+    const host = event.composedPath()[0] as Node | undefined
+    if (!host || !isElement(host)) {
+      return
+    }
+    if (host.shadowRoot && !isExtensionRoot(host)) {
+      this.observeShadowRoot(host.shadowRoot)
+      this.scan(host.shadowRoot)
+    }
   }
 
   private handleAdded(video: HTMLVideoElement): void {
