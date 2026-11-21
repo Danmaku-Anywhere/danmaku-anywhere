@@ -23,13 +23,22 @@ describe('shadowRootOf', () => {
     expect(open).toHaveBeenCalledWith(host)
   })
 
-  it('prefers Firefox openOrClosedShadowRoot when the element has it', () => {
+  it("reads Firefox's openOrClosedShadowRoot property when the element has it", () => {
     const host = document.createElement('div')
     const root = host.attachShadow({ mode: 'closed' })
-    Object.assign(host, { openOrClosedShadowRoot: () => root })
-    const chromeDom = vi.spyOn(chrome.dom, 'openOrClosedShadowRoot')
+    Object.defineProperty(host, 'openOrClosedShadowRoot', {
+      get: () => root,
+    })
 
     expect(shadowRootOf(host)).toBe(root)
-    expect(chromeDom).not.toHaveBeenCalled()
+  })
+
+  it('returns null when the Firefox property says there is no root', () => {
+    const host = document.createElement('div')
+    Object.defineProperty(host, 'openOrClosedShadowRoot', {
+      get: () => null,
+    })
+
+    expect(shadowRootOf(host)).toBeNull()
   })
 })

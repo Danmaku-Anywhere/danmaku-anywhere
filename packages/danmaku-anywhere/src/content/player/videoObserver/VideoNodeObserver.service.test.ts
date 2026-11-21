@@ -198,6 +198,37 @@ describe('VideoNodeObserverService', () => {
       expect(onChange).not.toHaveBeenCalled()
     })
 
+    it('ignores a video added to the shadow root of a host that was removed', async () => {
+      const { host, root } = makeHost()
+      container.appendChild(host)
+      service.start('video')
+      await flush()
+      host.remove()
+      await flush()
+      const onChange = vi.fn()
+      service.addEventListener('videoNodeChange', onChange)
+
+      root.appendChild(makeVideo())
+      await flush()
+      expect(onChange).not.toHaveBeenCalled()
+      expect(service.activeVideo).toBeNull()
+    })
+
+    it('does not rescan a root it already observes when an attach event repeats', async () => {
+      const { host, root } = makeHost()
+      container.appendChild(host)
+      service.start('video')
+      await flush()
+      const query = vi.spyOn(root, 'querySelectorAll')
+
+      for (let i = 0; i < 3; i++) {
+        host.dispatchEvent(
+          new Event(SHADOW_ROOT_ATTACHED_EVENT, { bubbles: true })
+        )
+      }
+      expect(query).not.toHaveBeenCalled()
+    })
+
     it('ignores the extension player root', async () => {
       const { host, root } = makeHost()
       host.id = PLAYER_ROOT_ID

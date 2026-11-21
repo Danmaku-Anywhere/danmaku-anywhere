@@ -15,18 +15,21 @@ const attachShadow = Element.prototype.attachShadow
 const dispatchEvent = EventTarget.prototype.dispatchEvent
 const PageEvent = Event
 
-Element.prototype.attachShadow = function (
-  this: Element,
-  init: ShadowRootInit
-): ShadowRoot {
-  const root = attachShadow.call(this, init)
-  try {
-    dispatchEvent.call(
-      this,
-      new PageEvent(SHADOW_ROOT_ATTACHED_EVENT, { bubbles: true })
-    )
-  } catch {
-    // the root is attached either way
-  }
-  return root
+// A method, not a function expression, so like the native one it has no
+// prototype and cannot be called with new.
+const hooked = {
+  attachShadow(this: Element, init: ShadowRootInit): ShadowRoot {
+    const root = attachShadow.call(this, init)
+    try {
+      dispatchEvent.call(
+        this,
+        new PageEvent(SHADOW_ROOT_ATTACHED_EVENT, { bubbles: true })
+      )
+    } catch {
+      // the root is attached either way
+    }
+    return root
+  },
 }
+
+Element.prototype.attachShadow = hooked.attachShadow

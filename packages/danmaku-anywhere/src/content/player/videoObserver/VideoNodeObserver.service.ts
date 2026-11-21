@@ -176,13 +176,19 @@ export class VideoNodeObserverService {
       return
     }
     const root = shadowRootOf(host)
-    if (root) {
-      this.observeShadowRoot(root)
-      this.scan(root)
+    if (!root || this.observedShadowRoots.has(root)) {
+      return
     }
+    this.observeShadowRoot(root)
+    this.scan(root)
   }
 
+  // A shadow root stays observed after its host leaves the page, so mutations
+  // inside a detached player still arrive here.
   private handleAdded(video: HTMLVideoElement): void {
+    if (!video.isConnected) {
+      return
+    }
     if (!this.stack.add(video, () => this.updateActive())) {
       return
     }

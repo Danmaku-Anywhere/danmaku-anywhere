@@ -42,6 +42,22 @@ describe('attachShadow hook', () => {
     document.removeEventListener(SHADOW_ROOT_ATTACHED_EVENT, onDocument, true)
   })
 
+  it('cannot be constructed, like the native attachShadow', () => {
+    const hooked = Element.prototype.attachShadow
+
+    expect(Object.hasOwn(hooked, 'prototype')).toBe(false)
+    expect(() => Reflect.construct(hooked, [{ mode: 'open' }])).toThrow(
+      TypeError
+    )
+  })
+
+  it('passes through the native error for a second root on one host', () => {
+    const host = document.createElement('div')
+    host.attachShadow({ mode: 'open' })
+
+    expect(() => host.attachShadow({ mode: 'open' })).toThrow(DOMException)
+  })
+
   it('still attaches when the page later breaks Event and dispatchEvent', () => {
     const listener = vi.fn()
     document.addEventListener(SHADOW_ROOT_ATTACHED_EVENT, listener, true)

@@ -68,11 +68,20 @@ function createScriptingRegistry(initial: RegisteredScript[]) {
   }
 }
 
-function setup(initial: RegisteredScript[]) {
+type ConfigInput = Pick<MountConfig, 'enabled' | 'patterns'>
+
+function toMountConfigs(configs: ConfigInput[]): MountConfig[] {
+  return configs.map((config, i) => {
+    return { ...config, name: `config-${i}` } as MountConfig
+  })
+}
+
+function setup(initial: RegisteredScript[], stored: ConfigInput[] = []) {
   let onChange: ConfigListener | undefined
+  let onInstalled: (() => Promise<void>) | undefined
   const mountConfigService = {
     getAll: async () => {
-      return []
+      return toMountConfigs(stored)
     },
     options: {
       onChange: (listener: ConfigListener) => {
@@ -83,7 +92,14 @@ function setup(initial: RegisteredScript[]) {
 
   const { registry, api } = createScriptingRegistry(initial)
   vi.stubGlobal('chrome', {
-    runtime: { onStartup: { addListener: () => {} } },
+    runtime: {
+      onStartup: { addListener: () => {} },
+      onInstalled: {
+        addListener: (listener: () => Promise<void>) => {
+          onInstalled = listener
+        },
+      },
+    },
     scripting: api,
   })
 
@@ -94,17 +110,15 @@ function setup(initial: RegisteredScript[]) {
     .toConstantValue(mountConfigService)
   container.get(ScriptingManager).setup()
 
-  async function changeConfigs(
-    configs: Pick<MountConfig, 'enabled' | 'patterns'>[]
-  ) {
-    await onChange?.(
-      configs.map((config, i) => {
-        return { ...config, name: `config-${i}` } as MountConfig
-      })
-    )
+  async function changeConfigs(configs: ConfigInput[]) {
+    await onChange?.(toMountConfigs(configs))
   }
 
-  return { registry, changeConfigs }
+  async function installUpdate() {
+    await onInstalled?.()
+  }
+
+  return { registry, changeConfigs, installUpdate }
 }
 
 function stale(id: string): RegisteredScript {
@@ -162,6 +176,18 @@ describe('ScriptingManager', () => {
     )
     expect(registry.get(MAIN_CONTENT_SCRIPT_ID)?.matches).toEqual(moviplayer)
     expect(registry.get(SHADOW_HOOK_SCRIPT_ID)?.matches).toEqual(moviplayer)
+  })
+
+  it('adds the hook on an extension update without waiting for a config change', async () => {
+    const { registry, installUpdate } = setup(
+      [stale(MAIN_CONTENT_SCRIPT_ID)],
+      [enabled]
+    )
+
+    await installUpdate()
+
+    expect(registry.get(SHADOW_HOOK_SCRIPT_ID)?.matches).toEqual(moviplayer)
+    expect(registry.get(MAIN_CONTENT_SCRIPT_ID)?.matches).toEqual(moviplayer)
   })
 
   it('unregisters both when no config is enabled', async () => {

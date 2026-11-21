@@ -1,5 +1,5 @@
 type FirefoxElement = Element & {
-  openOrClosedShadowRoot?: () => ShadowRoot | null
+  openOrClosedShadowRoot?: ShadowRoot | null
 }
 
 /**
@@ -13,8 +13,8 @@ export function shadowRootOf(host: Element): ShadowRoot | null {
     return host.shadowRoot
   }
   const firefoxHost = host as FirefoxElement
-  if (typeof firefoxHost.openOrClosedShadowRoot === 'function') {
-    return firefoxHost.openOrClosedShadowRoot()
+  if ('openOrClosedShadowRoot' in firefoxHost) {
+    return firefoxHost.openOrClosedShadowRoot ?? null
   }
   if (
     typeof chrome !== 'undefined' &&

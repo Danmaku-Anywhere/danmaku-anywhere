@@ -49,18 +49,23 @@ export class ScriptingManager {
   }
 
   setup() {
-    chrome.runtime.onStartup.addListener(async () => {
-      const configs = await this.mountConfigService.getAll()
-
-      // ensure the handler doesn't run in parallel. This can happen because options.onChange can get called at startup
-      await q.run(() => this.handleContentScriptRegistration(configs))
-    })
+    chrome.runtime.onStartup.addListener(() => this.syncFromStoredConfigs())
+    // An update can add scripts to the managed set, and existing installs
+    // would otherwise only pick them up on the next browser start.
+    chrome.runtime.onInstalled.addListener(() => this.syncFromStoredConfigs())
 
     this.mountConfigService.options.onChange(async (configs) => {
       if (!configs) return
 
       await q.run(() => this.handleContentScriptRegistration(configs))
     })
+  }
+
+  private async syncFromStoredConfigs() {
+    const configs = await this.mountConfigService.getAll()
+
+    // ensure the handler doesn't run in parallel. This can happen because options.onChange can get called at startup
+    await q.run(() => this.handleContentScriptRegistration(configs))
   }
 
   private async handleContentScriptRegistration(mountConfigs: MountConfig[]) {
