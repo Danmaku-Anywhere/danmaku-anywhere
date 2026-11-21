@@ -9,6 +9,7 @@ import {
   attachNetworkWatcher,
   type NetworkWatcher,
 } from './network-watcher'
+import { ensureCurrentBuildForMigration } from './priorRelease'
 import type { NetworkMock } from './profile'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -36,6 +37,8 @@ export const test = base.extend<{
   expectedConsoleErrors: ExpectedConsoleErrorPattern[]
   allowedNetworkOrigins: AllowedNetworkPattern[]
   catalogMock: NetworkMock
+  updatableExtension: boolean
+  extensionPath: string
   _assertNoUnexpectedConsoleErrors: void
   _assertNoUnmockedNetwork: void
 }>({
@@ -48,14 +51,32 @@ export const test = base.extend<{
   // before the SW's first fetch, so this can't be swapped from inside a test
   // body — see e2e/specs/providers/offline-fallback.spec.ts).
   catalogMock: [mockCatalog(), { option: true }],
+  // Loads a keyed copy of the build with the CDP Extensions domain unlocked,
+  // so the spec can install it again over itself with swapExtension.
+  updatableExtension: [false, { option: true }],
 
-  context: async ({ allowedNetworkOrigins, catalogMock }, use) => {
+  extensionPath: async ({ updatableExtension }, use) => {
+    await use(
+      updatableExtension
+        ? await ensureCurrentBuildForMigration()
+        : pathToExtension
+    )
+  },
+
+  context: async (
+    { allowedNetworkOrigins, catalogMock, updatableExtension, extensionPath },
+    use
+  ) => {
+    const args = [
+      `--disable-extensions-except=${extensionPath}`,
+      `--load-extension=${extensionPath}`,
+    ]
+    if (updatableExtension) {
+      args.push('--enable-unsafe-extension-debugging')
+    }
     const context = await chromium.launchPersistentContext('', {
       channel: 'chromium',
-      args: [
-        `--disable-extensions-except=${pathToExtension}`,
-        `--load-extension=${pathToExtension}`,
-      ],
+      args,
     })
     const consoleWatcher = attachConsoleWatcher(context)
     const networkWatcher = await attachNetworkWatcher(
