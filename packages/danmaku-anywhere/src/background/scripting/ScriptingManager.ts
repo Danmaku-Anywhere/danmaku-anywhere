@@ -90,31 +90,25 @@ export class ScriptingManager {
       return
     }
 
-    await this.applyScript(mainScript, patterns, registeredIds)
+    const toUpdate = scripts.filter((script) => registeredIds.has(script.id))
+    const toRegister = scripts.filter((script) => !registeredIds.has(script.id))
 
-    // Browsers without main-world content scripts (Firefox before 128) reject
-    // the hook. Shadow roots attached later are then missed, nothing else.
-    try {
-      await this.applyScript(shadowHook, patterns, registeredIds)
-    } catch (error) {
-      this.logger.warn('Could not register the attachShadow hook', error)
-    }
-  }
-
-  private async applyScript(
-    script: chrome.scripting.RegisteredContentScript,
-    patterns: string[],
-    registeredIds: Set<string>
-  ) {
-    const withPatterns = { ...script, matches: patterns }
-
-    if (registeredIds.has(script.id)) {
-      this.logger.debug('Updating content script', { id: script.id, patterns })
-      await chrome.scripting.updateContentScripts([withPatterns])
-      return
+    if (toRegister.length > 0) {
+      this.logger.debug('Registering content scripts', { patterns })
+      await chrome.scripting.registerContentScripts(
+        toRegister.map((script) => {
+          return { ...script, matches: patterns }
+        })
+      )
     }
 
-    this.logger.debug('Registering content script', { id: script.id, patterns })
-    await chrome.scripting.registerContentScripts([withPatterns])
+    if (toUpdate.length > 0) {
+      this.logger.debug('Updating content scripts', { patterns })
+      await chrome.scripting.updateContentScripts(
+        toUpdate.map((script) => {
+          return { ...script, matches: patterns }
+        })
+      )
+    }
   }
 }
