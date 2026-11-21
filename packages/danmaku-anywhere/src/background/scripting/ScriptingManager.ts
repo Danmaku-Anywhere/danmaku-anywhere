@@ -50,8 +50,8 @@ export class ScriptingManager {
 
   setup() {
     chrome.runtime.onStartup.addListener(() => this.syncFromStoredConfigs())
-    // An update can add scripts to the managed set, and existing installs
-    // would otherwise only pick them up on the next browser start.
+    // Chrome clears dynamically registered content scripts when the extension
+    // is updated or reloaded, even with persistAcrossSessions.
     chrome.runtime.onInstalled.addListener(() => this.syncFromStoredConfigs())
 
     this.mountConfigService.options.onChange(async (configs) => {

@@ -178,6 +178,18 @@ describe('ScriptingManager', () => {
     expect(registry.get(SHADOW_HOOK_SCRIPT_ID)?.matches).toEqual(moviplayer)
   })
 
+  it('registers both scripts again after an extension update cleared them', async () => {
+    const { registry, installUpdate } = setup([], [enabled])
+
+    await installUpdate()
+
+    expect(registry.get(MAIN_CONTENT_SCRIPT_ID)).toMatchObject({
+      js: ['controller.js'],
+      matches: moviplayer,
+    })
+    expect(registry.get(SHADOW_HOOK_SCRIPT_ID)?.matches).toEqual(moviplayer)
+  })
+
   it('adds the hook on an extension update without waiting for a config change', async () => {
     const { registry, installUpdate } = setup(
       [stale(MAIN_CONTENT_SCRIPT_ID)],
