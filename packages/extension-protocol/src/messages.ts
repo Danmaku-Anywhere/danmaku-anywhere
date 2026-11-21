@@ -48,7 +48,9 @@ export type ExtAction = {
   >
   episodeGetAll: ExtActionDef<void, GenericEpisodeLite[]>
   danmakuGet: ExtActionDef<GenericEpisodeLite, CommentEntity[]>
-  setRequestHeaders: ExtActionDef<SetHeaderRule, void>
+  // Extensions from before the removal path existed answer with no rule id.
+  setRequestHeaders: ExtActionDef<SetHeaderRule, number | undefined>
+  removeRequestHeaders: ExtActionDef<{ ruleId: number }, void>
 }
 
 type ExtRequestBase<T extends ExtActionType> = {
