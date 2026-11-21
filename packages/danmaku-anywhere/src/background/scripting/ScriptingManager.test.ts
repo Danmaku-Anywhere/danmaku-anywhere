@@ -21,13 +21,26 @@ vi.mock('@/content/shadowHook/index.iife?script', () => {
  * The controller and the main-world attachShadow hook are registered together
  * from the enabled mount config patterns, and nowhere else. Runs against an
  * in-memory chrome.scripting registry and asserts what ends up registered
- * after first registration, updates, a controller-only install, and removal.
+ * after first registration, updates, a controller-only install, a browser
+ * that rejects main-world scripts, and removal.
  */
 
 type RegisteredScript = chrome.scripting.RegisteredContentScript
 type ConfigListener = (configs: MountConfig[] | undefined) => Promise<void>
 
-function createScriptingRegistry(initial: RegisteredScript[]) {
+function createScriptingRegistry(
+  initial: RegisteredScript[],
+  { supportsMainWorld = true } = {}
+) {
+  function validate(scripts: RegisteredScript[]) {
+    const usesMainWorld = scripts.some((script) => {
+      return script.world === 'MAIN'
+    })
+    if (!supportsMainWorld && usesMainWorld) {
+      throw new Error('Unsupported world: MAIN')
+    }
+  }
+
   const registry = new Map(
     initial.map((script) => {
       return [script.id, script]
@@ -43,6 +56,7 @@ function createScriptingRegistry(initial: RegisteredScript[]) {
         })
       },
       registerContentScripts: async (scripts: RegisteredScript[]) => {
+        validate(scripts)
         for (const script of scripts) {
           if (registry.has(script.id)) {
             throw new Error(`Duplicate script ID '${script.id}'`)
@@ -51,6 +65,7 @@ function createScriptingRegistry(initial: RegisteredScript[]) {
         }
       },
       updateContentScripts: async (scripts: RegisteredScript[]) => {
+        validate(scripts)
         for (const script of scripts) {
           const existing = registry.get(script.id)
           if (!existing) {
@@ -76,7 +91,11 @@ function toMountConfigs(configs: ConfigInput[]): MountConfig[] {
   })
 }
 
-function setup(initial: RegisteredScript[], stored: ConfigInput[] = []) {
+function setup(
+  initial: RegisteredScript[],
+  stored: ConfigInput[] = [],
+  browser: { supportsMainWorld?: boolean } = {}
+) {
   let onChange: ConfigListener | undefined
   let onInstalled: (() => Promise<void>) | undefined
   const mountConfigService = {
@@ -90,7 +109,7 @@ function setup(initial: RegisteredScript[], stored: ConfigInput[] = []) {
     },
   }
 
-  const { registry, api } = createScriptingRegistry(initial)
+  const { registry, api } = createScriptingRegistry(initial, browser)
   vi.stubGlobal('chrome', {
     runtime: {
       onStartup: { addListener: () => {} },
@@ -187,6 +206,29 @@ describe('ScriptingManager', () => {
     await installUpdate()
 
     expect(registry.get(SHADOW_HOOK_SCRIPT_ID)?.matches).toEqual(moviplayer)
+    expect(registry.get(MAIN_CONTENT_SCRIPT_ID)?.matches).toEqual(moviplayer)
+  })
+
+  it('still registers the controller when the browser rejects the main-world hook', async () => {
+    const { registry, changeConfigs } = setup([], [], {
+      supportsMainWorld: false,
+    })
+
+    await changeConfigs([enabled])
+
+    expect(registry.get(MAIN_CONTENT_SCRIPT_ID)?.matches).toEqual(moviplayer)
+    expect(registry.has(SHADOW_HOOK_SCRIPT_ID)).toBe(false)
+  })
+
+  it('keeps updating the controller when the browser rejects the main-world hook', async () => {
+    const { registry, changeConfigs } = setup(
+      [stale(MAIN_CONTENT_SCRIPT_ID)],
+      [],
+      { supportsMainWorld: false }
+    )
+
+    await changeConfigs([enabled])
+
     expect(registry.get(MAIN_CONTENT_SCRIPT_ID)?.matches).toEqual(moviplayer)
   })
 
