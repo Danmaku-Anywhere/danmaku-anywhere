@@ -1,5 +1,6 @@
 import { inject, injectable } from 'inversify'
 import { UpgradeFailureBadge } from '@/background/syncOptions/UpgradeFailureBadge'
+import { sakuraLight } from '@/common/theme/sakuraTokens'
 import { invariant, isServiceWorker } from '@/common/utils/utils'
 
 // A single space draws the badge as a small empty pill.
@@ -18,7 +19,15 @@ export class IconService {
   }
 
   async setActive(tabId: number) {
-    await this.setBadgeText(MOUNTED_BADGE_TEXT, tabId)
+    if (this.upgradeFailureBadge.isShowing()) {
+      return
+    }
+    // Global rather than per tab, so the upgrade-failure badge's red still
+    // wins on every tab once it shows.
+    await chrome.action.setBadgeBackgroundColor({
+      color: sakuraLight.success.main,
+    })
+    await chrome.action.setBadgeText({ text: MOUNTED_BADGE_TEXT, tabId })
   }
 
   async setUnavailable(tabId: number) {

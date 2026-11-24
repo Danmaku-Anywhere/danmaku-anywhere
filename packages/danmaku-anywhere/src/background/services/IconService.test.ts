@@ -1,6 +1,7 @@
 import { fakeBrowser } from '@webext-core/fake-browser'
 import { describe, expect, it, vi } from 'vitest'
 import { UpgradeFailureBadge } from '@/background/syncOptions/UpgradeFailureBadge'
+import { sakuraLight } from '@/common/theme/sakuraTokens'
 import { IconService } from './IconService'
 
 vi.mock('@/common/utils/utils', async (importOriginal) => {
@@ -20,17 +21,24 @@ function watchTabBadge(tabId: number) {
     }
   )
   vi.spyOn(fakeBrowser.action, 'setIcon').mockResolvedValue(undefined)
+  vi.spyOn(fakeBrowser.action, 'setBadgeBackgroundColor').mockResolvedValue(
+    undefined
+  )
   return texts
 }
 
 describe('IconService', () => {
-  it('marks a tab with mounted danmaku by a badge without a number', async () => {
+  it('marks a tab with mounted danmaku by a green badge without a number', async () => {
     const texts = watchTabBadge(7)
+    const setColor = vi
+      .spyOn(fakeBrowser.action, 'setBadgeBackgroundColor')
+      .mockResolvedValue(undefined)
     const service = new IconService(new UpgradeFailureBadge())
 
     await service.setActive(7)
 
     expect(texts).toEqual([' '])
+    expect(setColor).toHaveBeenCalledWith({ color: sakuraLight.success.main })
   })
 
   it('clears the mark when the tab goes back to normal', async () => {
