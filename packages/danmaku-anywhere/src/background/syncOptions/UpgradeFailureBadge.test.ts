@@ -13,6 +13,11 @@ vi.mock('@/common/utils/utils', async (importOriginal) => {
   }
 })
 
+// lint-specs-allow-unused-mock: IconService draws the mounted icon with OffscreenCanvas, which the test environment lacks
+vi.mock('@/background/services/mountedIcon', () => {
+  return { drawMountedIcon: async () => ({}) }
+})
+
 /**
  * UpgradeFailureBadge puts a badge on the toolbar icon, globally and on every
  * open tab, while this build has a failed options upgrade recorded, including
@@ -116,7 +121,7 @@ describe('UpgradeFailureBadge', () => {
     })
   })
 
-  it('keeps the per-tab mounted badge from covering it', async () => {
+  it('keeps a mounted tab from clearing it', async () => {
     await fakeBrowser.storage.local.set({ [UPGRADE_RUN_KEY]: failedRun })
     const tabId = await openTab()
     const texts = watchBadges()
