@@ -6,15 +6,12 @@ import { useStore } from '@/content/controller/store/store'
 
 export const useIconManager = () => {
   const config = useActiveConfig()
-  const { isMounted, comments } = useStore.use.danmaku()
+  const { isMounted } = useStore.use.danmaku()
 
   useEffect(() => {
     if (isMounted) {
-      return void chromeRpcClient.iconSet({
-        state: 'active',
-        count: comments.length,
-      })
+      return void chromeRpcClient.iconSet({ state: 'active' })
     }
     return void chromeRpcClient.iconSet({ state: 'available' })
-  }, [config, comments, isMounted]) // config is included to ensure icon is reset when config changes
+  }, [config, isMounted]) // config is included to ensure icon is reset when config changes
 }

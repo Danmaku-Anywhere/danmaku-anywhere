@@ -190,8 +190,8 @@ export class RpcManager {
         const tabId = sender.tab.id
 
         match(data)
-          .with({ state: 'active' }, (data) => {
-            void this.iconService.setActive(tabId, data.count)
+          .with({ state: 'active' }, () => {
+            void this.iconService.setActive(tabId)
           })
           .with({ state: 'inactive' }, () => {
             void this.iconService.setNormal(tabId)

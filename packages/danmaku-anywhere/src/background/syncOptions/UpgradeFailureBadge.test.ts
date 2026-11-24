@@ -116,7 +116,7 @@ describe('UpgradeFailureBadge', () => {
     })
   })
 
-  it('keeps per-tab comment counts from covering the badge', async () => {
+  it('keeps the per-tab mounted badge from covering it', async () => {
     await fakeBrowser.storage.local.set({ [UPGRADE_RUN_KEY]: failedRun })
     const tabId = await openTab()
     const texts = watchBadges()
@@ -126,7 +126,7 @@ describe('UpgradeFailureBadge', () => {
       expect(badge.isShowing()).toBe(true)
     })
 
-    await new IconService(badge).setActive(tabId, 120)
+    await new IconService(badge).setActive(tabId)
 
     expect(texts.get(tabId)).toBe('!')
   })

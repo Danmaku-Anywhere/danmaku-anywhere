@@ -2,6 +2,9 @@ import { inject, injectable } from 'inversify'
 import { UpgradeFailureBadge } from '@/background/syncOptions/UpgradeFailureBadge'
 import { invariant, isServiceWorker } from '@/common/utils/utils'
 
+// A single space draws the badge as a small empty pill.
+const MOUNTED_BADGE_TEXT = ' '
+
 @injectable('Singleton')
 export class IconService {
   constructor(
@@ -14,9 +17,8 @@ export class IconService {
     )
   }
 
-  async setActive(tabId: number, commentCount: number) {
-    const badgeText = commentCount > 999 ? '999+' : commentCount.toString()
-    await this.setBadgeText(badgeText, tabId)
+  async setActive(tabId: number) {
+    await this.setBadgeText(MOUNTED_BADGE_TEXT, tabId)
   }
 
   async setUnavailable(tabId: number) {

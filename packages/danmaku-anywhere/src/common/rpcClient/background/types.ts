@@ -78,7 +78,6 @@ import type { RPCDef } from '../../rpc/types'
 type IconSetDto =
   | {
       state: 'active'
-      count: number
     }
   | {
       state: 'inactive'
