@@ -5,24 +5,10 @@ import { expect, test } from '../../setup/fixtures'
 import { applyProfile } from '../../setup/profile'
 
 /**
- * The generic provider config editor renders fields from the manifest's
- * configSchema (text, select, nested objects) instead of hand-written per
- * provider forms. Drives the editor for a custom DanDanPlay-compatible server
- * and the built-in Bilibili provider, asserting the schema-driven fields show,
- * a save toast appears, and the edited values land in stored configValues.
- * Also asserts the schema's `required` constraint blocks saving an empty
- * auth header until it is filled, and that configSchema constraints
- * (format: uri, minimum) surface as field errors and block saving until
- * the values are fixed. Field titles localize with the UI language,
- * so they are matched against both the English source and the zh override.
- * A labelled enum (oneOf const/title) lists its titles, not the raw values.
- * The built-in DanDanPlay hides its server and credential fields behind a
- * note, which a built-in without a server field does not show, and its
- * editor fits the popup without a sideways scrollbar. A custom source gets a
- * local-network toggle, off by default, that persists on the config; built-ins
- * do not show it.
- * Finally, a provider whose manifest spec fails to load shows an error with a
- * retry action instead of a stripped name-only form that would drop its config.
+ * The provider config editor renders configSchema fields in English and zh,
+ * enforces their constraints, and saves configValues. Built-in DanDanPlay hides
+ * its server fields; only custom sources get the local-network toggle, off by
+ * default. A manifest that fails to load shows an error with retry.
  */
 
 const customDdp: ProviderConfig = {
