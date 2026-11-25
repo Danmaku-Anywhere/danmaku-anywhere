@@ -221,18 +221,7 @@ describe('ProviderService.probeLogin', () => {
     return { service, runLoginProbe }
   }
 
-  it('keeps the private-host block when no config of the manifest opted in', async () => {
-    const { service, runLoginProbe } = buildProbe([
-      makeConfig('dandanplay'),
-      { ...makeConfig('bilibili'), allowLocalOrigins: true },
-    ])
-
-    await service.probeLogin('dandanplay')
-
-    expect(runLoginProbe).toHaveBeenCalledWith(undefined, {})
-  })
-
-  it('lifts the private-host block when a config of the manifest opted in', async () => {
+  it('keeps the private-host block even when a config of the manifest opted in', async () => {
     const { service, runLoginProbe } = buildProbe([
       makeConfig('dandanplay'),
       { ...makeConfig('dandanplay'), id: 'lan-ddp', allowLocalOrigins: true },
@@ -240,9 +229,7 @@ describe('ProviderService.probeLogin', () => {
 
     await service.probeLogin('dandanplay')
 
-    expect(runLoginProbe).toHaveBeenCalledWith(undefined, {
-      allowPrivateHosts: true,
-    })
+    expect(runLoginProbe).toHaveBeenCalledWith(undefined, {})
   })
 })
 

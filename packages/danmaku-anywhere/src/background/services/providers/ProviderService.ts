@@ -259,19 +259,11 @@ export class ProviderService {
     )
   }
 
-  // The probe is per manifest and runs on the manifest's own defaults, so it
-  // may reach a private host only when one of that manifest's configs opted in.
+  // The probe runs on the manifest's own defaults rather than any config's
+  // inputs, so a config's local-origins opt-in does not cover it.
   async probeLogin<T = unknown>(manifestId: string): Promise<T | null> {
     const runner = await this.manifestRegistry.getRunner(manifestId)
-    const configs = await this.providerConfigService.getAll()
-    const allowLocalOrigins = configs.some(
-      (config) =>
-        config.manifestId === manifestId && config.allowLocalOrigins === true
-    )
-    return runner.runLoginProbe<T>(
-      undefined,
-      manifestRunOptions(allowLocalOrigins)
-    )
+    return runner.runLoginProbe<T>(undefined, manifestRunOptions())
   }
 
   // Resolves whether a manifest-driven source needs a login/cookie action so

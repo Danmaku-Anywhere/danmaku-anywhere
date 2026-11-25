@@ -332,7 +332,12 @@ describe('ManifestProviderService run options', () => {
   })
 
   it('runs every pipeline of an opted-in config with the private-host opt-in', async () => {
-    const runner = makeRunner({ search: [], episodes: [], danmaku: [] })
+    const runner = makeRunner({
+      search: [],
+      season: null,
+      episodes: [],
+      danmaku: [],
+    })
     const svc = new ManifestProviderService(
       {
         manifestId: 'dandanplay',
@@ -345,7 +350,9 @@ describe('ManifestProviderService run options', () => {
     )
 
     await svc.search({ keyword: 'x' })
+    await svc.getSeason({ animeId: 1 })
     await svc.getEpisodes({ animeId: 1 })
+    await svc.parseUrl('http://192.168.1.10:8080/v/1')
     await svc.getDanmaku({
       type: 'by-meta',
       meta: {
@@ -362,9 +369,17 @@ describe('ManifestProviderService run options', () => {
     expect(runner.runSearch).toHaveBeenCalledWith(expect.anything(), {
       allowPrivateHosts: true,
     })
+    expect(runner.runSeason).toHaveBeenCalledWith(expect.anything(), {
+      allowPrivateHosts: true,
+    })
     expect(runner.runEpisodes).toHaveBeenCalledWith(expect.anything(), {
       allowPrivateHosts: true,
     })
+    expect(runner.runParseUrl).toHaveBeenCalledWith(
+      'http://192.168.1.10:8080/v/1',
+      undefined,
+      { allowPrivateHosts: true }
+    )
     expect(runner.runDanmaku).toHaveBeenCalledWith(expect.anything(), {
       allowPrivateHosts: true,
       continueOnError: true,

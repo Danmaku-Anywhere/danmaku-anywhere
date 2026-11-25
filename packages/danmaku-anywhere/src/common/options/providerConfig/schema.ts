@@ -6,9 +6,8 @@ import type { Options } from '@/common/options/OptionsService/types'
 // valid, that's the manifest's job. The provider tag is derived from
 // `manifestId` on read (providerTypeFromManifestId), not persisted.
 //
-// `allowLocalOrigins` lets this one config's pipelines reach private and
-// loopback hosts (a self-hosted LAN server). Absent means off, so stored
-// configs from before the field keep the engine's private-host block.
+// `allowLocalOrigins` lets this config's pipelines reach private and loopback
+// hosts, such as a self-hosted LAN server. Absent means off.
 export const providerConfigSchema = z.object({
   id: z.string(),
   manifestId: z.string(),
