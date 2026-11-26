@@ -120,9 +120,28 @@ Each package/app has its own `AGENTS.md` with package-specific conventions and g
 
 Keep `AGENTS.md` files updated when adding conventions or gotchas that are specific to that package.
 
-## Pull requests
+## Checking a change in a browser
 
-Every PR that changes something a user can see includes before and after screenshots in its body, and a short clip when the change involves motion or a sequence of steps. How to capture and host them is in the PR step of `.claude/commands/da-dev.md`.
+The extension is checked in a real Chromium with `build/` loaded, never `dev/chrome` (that is the human's `pnpm dev:browser` profile).
+
+- Start with the `verifying-changes` skill. It sets the bar: a spec that failed without the change and passes with it. `browser-verify` is for exploring (selectors, console, network) and `e2e-spec` is for writing the spec.
+- `cd packages/danmaku-anywhere && pnpm run verify:explore` rebuilds `build/` when it is stale (`VITE_DA_ENV=e2e`) and prints the commands to drive it. If Chromium is missing, install it with `pnpm exec playwright install chromium` in that package.
+- Specs refuse to run against a stale `build/`. After changing product code, run `VITE_DA_ENV=e2e pnpm run build` before `pnpm exec playwright test <spec>`.
+- Reload a rebuilt extension in a running browser with CDP `Extensions.loadUnpacked`, as `e2e/setup/swapExtension.ts` does. `chrome.runtime.reload()` does not bring the extension back under `--load-extension`.
+- Playwright empties `packages/danmaku-anywhere/test-results` on every run. Copy screenshots and recordings out before the next run.
+- To exercise a published nightly or branch preview build instead of a local one, use the `preview-build` skill.
+
+## Before opening a pull request
+
+1. `pnpm lint`. It runs `tsc`, Biome with autofix, and `lint:specs`, which fails locally on `as unknown as` doubles in unit tests, tests that only assert `toHaveBeenCalled*`, and `vi.mock` of modules nobody imports. In CI it only annotates.
+2. `pnpm --filter '...[origin/master]' test` for the packages you touched.
+3. Changed translation keys: `cd packages/danmaku-anywhere && pnpm i18n extract`, translate new `zh` entries, commit the JSON. CI fails the i18n check otherwise.
+4. Runtime behaviour in the extension: the spec from `verifying-changes` (red before green), plus the affected e2e specs by path.
+5. `pnpm -s fallow audit --base origin/master --skip health`, the same dead-code audit CI runs. Fix valid findings, and read the job log and PR comment in CI, because the check can pass while still reporting warnings.
+6. Title the PR `(type) description [DA-XXX]` with type one of `extension`, `app`, `proxy`, `chore`, `docs`; CI checks the format.
+7. A change a user can see gets before and after screenshots in the PR body, and a short clip when it involves motion or a sequence of steps. Capture and hosting steps are in the PR step of `.claude/commands/da-dev.md`.
+
+Fix failing CI checks on your PR without waiting to be asked.
 
 ## Pre-commit hooks
 
