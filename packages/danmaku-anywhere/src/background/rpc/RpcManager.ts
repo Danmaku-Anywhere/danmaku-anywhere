@@ -14,7 +14,6 @@ import {
   EXTERNAL_RPC_ALLOWLIST,
   gateExternalHandlers,
 } from '@/background/rpc/externalRpc'
-import { PlaybackTracker } from '@/background/selfReload/PlaybackTracker'
 import { BackupService } from '@/background/services/Backup/BackupService.service'
 import { DataManagementService } from '@/background/services/DataManagementService'
 import { GenAIService } from '@/background/services/GenAIService'
@@ -99,9 +98,7 @@ export class RpcManager {
     @inject(OptionsUpgradeService)
     private optionsUpgradeService: OptionsUpgradeService,
     @inject(SourceCapabilityService)
-    private sourceCapabilities: SourceCapabilityService,
-    @inject(PlaybackTracker)
-    private playbackTracker: PlaybackTracker
+    private sourceCapabilities: SourceCapabilityService
   ) {
     this.logger = logger.sub('[RpcManager]')
   }
@@ -513,16 +510,6 @@ export class RpcManager {
       }
     }
 
-    const trackPlayback = <TRPCDef extends AnyRPCDef>(
-      handler: RRPServerHandler<TRPCDef>,
-      isPlaying: (input: TRPCDef['input']) => boolean
-    ): RRPServerHandler<TRPCDef> => {
-      return async (input, sender, setContext, options) => {
-        await this.playbackTracker.setPlaying(sender, isPlaying(input))
-        return handler(input, sender, setContext, options)
-      }
-    }
-
     const rpcRelay = createRpcServer<PlayerRelayCommands & PlayerRelayEvents>(
       {
         'relay:command:apply': passThrough(
@@ -555,21 +542,17 @@ export class RpcManager {
         'relay:event:playerReady': passThrough(
           relayFrameClient['relay:event:playerReady']
         ),
-        'relay:event:playerUnload': trackPlayback(
-          passThrough(relayFrameClient['relay:event:playerUnload']),
-          () => false
+        'relay:event:playerUnload': passThrough(
+          relayFrameClient['relay:event:playerUnload']
         ),
-        'relay:event:videoChange': trackPlayback(
-          passThrough(relayFrameClient['relay:event:videoChange']),
-          (input) => input.data.playing
+        'relay:event:videoChange': passThrough(
+          relayFrameClient['relay:event:videoChange']
         ),
-        'relay:event:videoRemoved': trackPlayback(
-          passThrough(relayFrameClient['relay:event:videoRemoved']),
-          () => false
+        'relay:event:videoRemoved': passThrough(
+          relayFrameClient['relay:event:videoRemoved']
         ),
-        'relay:event:videoStateChange': trackPlayback(
-          passThrough(relayFrameClient['relay:event:videoStateChange']),
-          (input) => input.data.playing
+        'relay:event:videoStateChange': passThrough(
+          relayFrameClient['relay:event:videoStateChange']
         ),
         'relay:event:preloadNextEpisode': passThrough(
           relayFrameClient['relay:event:preloadNextEpisode']

@@ -2,7 +2,7 @@ import { inject, injectable } from 'inversify'
 import { alarmKeys } from '@/common/alarms/constants'
 import { type ILogger, LoggerSymbol } from '@/common/Logger'
 import { ExtStorageService } from '@/common/storage/ExtStorageService'
-import { PlaybackTracker } from './PlaybackTracker'
+import { isAnyVideoPlaying } from './isAnyVideoPlaying'
 
 // Danmaku Builds writes this into the folder it swaps builds into.
 const MARKER_FILE = 'build.json'
@@ -44,10 +44,7 @@ export class BuildSwapReloader {
   )
   private logger: ILogger
 
-  constructor(
-    @inject(LoggerSymbol) logger: ILogger,
-    @inject(PlaybackTracker) private playbackTracker: PlaybackTracker
-  ) {
+  constructor(@inject(LoggerSymbol) logger: ILogger) {
     this.logger = logger.sub('[BuildSwapReloader]')
   }
 
@@ -85,7 +82,7 @@ export class BuildSwapReloader {
     if (tag === null || tag === loaded.tag) {
       return
     }
-    if (await this.playbackTracker.isAnyPlaying()) {
+    if (await isAnyVideoPlaying()) {
       return
     }
     this.logger.info(`Build changed from ${loaded.tag} to ${tag}, reloading`)

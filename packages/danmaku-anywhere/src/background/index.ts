@@ -8,7 +8,6 @@ import { RpcManager } from '@/background/rpc/RpcManager'
 import { MountConfigTabReloader } from '@/background/scripting/MountConfigTabReloader'
 import { ScriptingManager } from '@/background/scripting/ScriptingManager'
 import { BuildSwapReloader } from '@/background/selfReload/BuildSwapReloader'
-import { PlaybackTracker } from '@/background/selfReload/PlaybackTracker'
 import { ProviderService } from '@/background/services/providers/ProviderService'
 import { OptionsManager } from '@/background/syncOptions/OptionsManager'
 import { UpgradeFailureBadge } from '@/background/syncOptions/UpgradeFailureBadge'
@@ -39,7 +38,6 @@ container.get(RpcManager).setup()
 container.get(NetRequestManager).setup()
 setupCookieReplay()
 container.get(AlarmManager).setup()
-container.get(PlaybackTracker).setup()
 container.get(BuildSwapReloader).setup()
 container.get(PortsManager).setup()
 
