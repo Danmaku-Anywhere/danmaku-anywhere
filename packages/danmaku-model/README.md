@@ -4,7 +4,7 @@ The shared danmaku data model: comment, episode, season, bookmark and provider s
 
 ## Usage
 
-Consumed by `danmaku-engine`, `danmaku-provider`, `extension-protocol`, the extension and the web app. Main entry: `src/index.js` / `src/index.d.ts`.
+Consumed by `danmaku-engine`, `danmaku-provider`, `extension-protocol`, the extension and the web app.
 
 ## Scripts
 

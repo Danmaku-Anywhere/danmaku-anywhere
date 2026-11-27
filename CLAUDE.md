@@ -138,8 +138,9 @@ The extension is checked in a real Chromium with `build/` loaded, never `dev/chr
 3. Changed translation keys: `cd packages/danmaku-anywhere && pnpm i18n extract`, translate new `zh` entries, commit the JSON. CI fails the i18n check otherwise.
 4. Runtime behaviour in the extension: the spec from `verifying-changes` (red before green), plus the affected e2e specs by path.
 5. `pnpm -s fallow audit --base origin/master --skip health`, the same dead-code audit CI runs. Fix valid findings, and read the job log and PR comment in CI, because the check can pass while still reporting warnings.
-6. Title the PR `(type) description [DA-XXX]` with type one of `extension`, `app`, `proxy`, `chore`, `docs`; CI checks the format.
+6. Title the PR `(type) description [DA-XXX]` with type one of `extension`, `app`, `proxy`, `chore`, `docs`; CI checks the format. The title check also fails when the branch name carries a different DA id than the title, so put the same id in the branch name. When the ClickUp token is set in CI, it also fails when the type in the title differs from the task's Type field in ClickUp.
 7. A change a user can see gets before and after screenshots in the PR body, and a short clip when it involves motion or a sequence of steps. Capture and hosting steps are in the PR step of `.claude/commands/da-dev.md`.
+8. CI runs the extension's tests against a checkout of `Danmaku-Anywhere/docs` (`DA_DOCS_DIR`, read by `docsPaths.test.ts`). Locally that test is skipped unless you clone the docs repo and run `DA_DOCS_DIR=/path/to/docs pnpm --filter @mr-quin/danmaku-anywhere test`.
 
 Fix failing CI checks on your PR without waiting to be asked.
 
@@ -152,6 +153,6 @@ Lefthook runs Biome check on staged files before each commit (auto-fixes formatt
 - Always run `pnpm build:packages` before running the extension in dev mode, since it imports from workspace packages
 - The extension uses `@crxjs/vite-plugin` which has its own HMR behavior — don't confuse with standard Vite
 - `pnpm-lock.yaml` is in `.cursorignore` — don't try to read it
-- The project uses `pnpm@11.2.2` — do not use npm or yarn
+- The package manager is pinned by `packageManager` in the root `package.json` — do not use npm or yarn
 - Danmaku Builds (the release manager) lives in `Danmaku-Anywhere/release-manager` now. Never delete the `release-manager-latest` release or its tag here: copies older than 0.5.0 still update through it.
 - The documentation site lives in `Danmaku-Anywhere/docs` now. Its changelog page is regenerated daily from this repo's published releases, so release notes are the place to fix changelog text.
