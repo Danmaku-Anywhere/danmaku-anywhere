@@ -18,6 +18,10 @@ permissions:
   contents: read
   pull-requests: write
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   e2e:
     # ubuntu-latest is Ubuntu 26.04 now, which the Playwright in the lockfile
