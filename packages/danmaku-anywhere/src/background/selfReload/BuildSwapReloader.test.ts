@@ -5,12 +5,14 @@ import { LoggerSymbol } from '@/common/Logger'
 import { createTestContainer } from '@/tests/createTestContainer'
 import { silentLogger } from '@/tests/silentLogger'
 import { BuildSwapReloader } from './BuildSwapReloader'
+import { PlaybackTracker } from './PlaybackTracker'
 
 /**
  * An unpacked build that Danmaku Builds swapped out from under the extension
  * reloads itself. Covers that only development installs start the check, that
- * a changed build.json tag triggers chrome.runtime.reload, and that an
- * unchanged or missing marker leaves the extension alone.
+ * a changed build.json tag triggers chrome.runtime.reload, that an unchanged
+ * or missing marker leaves the extension alone, and that the reload waits
+ * while a video is playing.
  */
 
 let markerTag: string | undefined
@@ -24,11 +26,19 @@ function setInstallType(
   })
 }
 
-function createReloader() {
+function createContainer() {
   return createTestContainer(
     [backgroundContainerModule],
     [{ identifier: LoggerSymbol, value: silentLogger }]
-  ).get(BuildSwapReloader)
+  )
+}
+
+function createReloader() {
+  return createContainer().get(BuildSwapReloader)
+}
+
+function playerFrame(tabId: number, frameId: number) {
+  return { tab: { id: tabId }, frameId } as chrome.runtime.MessageSender
 }
 
 async function startReloader() {
@@ -48,6 +58,7 @@ async function fireCheck() {
 }
 
 beforeEach(() => {
+  fakeBrowser.reset()
   markerTag = undefined
   reload.mockClear()
   fakeBrowser.runtime.reload = reload
@@ -111,6 +122,31 @@ describe('BuildSwapReloader', () => {
     await startReloader()
 
     markerTag = 'v1'
+    await fireCheck()
+    expect(reload).toHaveBeenCalledTimes(1)
+  })
+
+  it('waits for every playing video to stop before reloading', async () => {
+    setInstallType('development')
+    markerTag = 'v1'
+    await startReloader()
+    const tracker = createContainer().get(PlaybackTracker)
+    tracker.setup()
+
+    await tracker.setPlaying(playerFrame(1, 0), true)
+    await tracker.setPlaying(playerFrame(2, 3), true)
+    markerTag = 'v2'
+    await fireCheck()
+    expect(reload).not.toHaveBeenCalled()
+
+    await tracker.setPlaying(playerFrame(1, 0), false)
+    await fireCheck()
+    expect(reload).not.toHaveBeenCalled()
+
+    await fakeBrowser.tabs.onRemoved.trigger(2, {
+      windowId: 1,
+      isWindowClosing: false,
+    })
     await fireCheck()
     expect(reload).toHaveBeenCalledTimes(1)
   })
