@@ -45,6 +45,55 @@ describe('ManifestSandbox.validate', () => {
   })
 })
 
+describe('ManifestSandbox.validate compatibility', () => {
+  it('flags a manifest that needs a newer engine instead of listing schema issues', () => {
+    const result = new ManifestSandbox().validate({
+      ...makeManifest(),
+      minEngineVersion: '99.0.0',
+    })
+    expect(result).toEqual({
+      valid: false,
+      issues: [
+        {
+          path: 'minEngineVersion',
+          message: expect.any(String),
+          incompatibility: {
+            reason: 'engine-version',
+            minEngineVersion: '99.0.0',
+          },
+        },
+      ],
+    })
+  })
+
+  it('flags an unsupported apiVersion', () => {
+    const result = new ManifestSandbox().validate({
+      ...makeManifest(),
+      apiVersion: 2,
+    })
+    expect(result.valid).toBe(false)
+    if (!result.valid) {
+      expect(result.issues[0].incompatibility).toEqual({
+        reason: 'api-version',
+        apiVersion: 2,
+      })
+    }
+  })
+
+  it('flags a malformed minEngineVersion as a schema issue, not an incompatibility', () => {
+    const result = new ManifestSandbox().validate({
+      ...makeManifest(),
+      minEngineVersion: 'soon',
+    })
+    expect(result.valid).toBe(false)
+    if (!result.valid) {
+      expect(result.issues.every((i) => i.incompatibility === undefined)).toBe(
+        true
+      )
+    }
+  })
+})
+
 describe('ManifestSandbox test runs', () => {
   it('searches with the keyword, merges config values, and withholds allowPrivateHosts', async () => {
     const runSearch = vi

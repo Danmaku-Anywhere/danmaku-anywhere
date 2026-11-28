@@ -792,6 +792,11 @@
     "filter": {
       "placeholder": "Filter sources"
     },
+    "incompatible": {
+      "apiVersion": "Uses API version {{version}}, which this version of the extension does not support.",
+      "engineVersion": "Needs engine {{version}} or newer. Update the extension to use it.",
+      "title": "Some sources cannot run on this version"
+    },
     "installed": {
       "addDefaultInstance": "Add default instance",
       "addInstance": "Add instance",

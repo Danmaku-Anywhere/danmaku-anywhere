@@ -20,7 +20,7 @@ import type {
   KazumiSearchResult,
   SetHeaderRule,
 } from '@danmaku-anywhere/extension-protocol'
-import type { ConfigSchema } from '@mr-quin/dango'
+import type { ConfigSchema, ManifestIncompatibility } from '@mr-quin/dango'
 import type {
   GenericVodSearchData,
   MatchEpisodeInput,
@@ -128,8 +128,16 @@ export interface ProviderManifestInfo {
   kind: 'preinstalled' | 'user' | 'bundled'
 }
 
+export interface IncompatibleManifestInfo {
+  id: string
+  name: string
+  version?: string
+  incompatibility: ManifestIncompatibility
+}
+
 export interface ProviderManifestList {
   manifests: ProviderManifestInfo[]
+  incompatible: IncompatibleManifestInfo[]
   lastCheckedAt: number | null
 }
 
@@ -142,6 +150,7 @@ export interface ManifestUpdate {
 export interface ManifestValidationIssue {
   path: string
   message: string
+  incompatibility?: ManifestIncompatibility
 }
 
 export type ManifestValidationResult =

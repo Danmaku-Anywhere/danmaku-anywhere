@@ -4,7 +4,7 @@ import { createLogger, type LogEntry } from '@/common/Logger'
 import { publishDataChange } from '@/common/messaging/dataChangeChannel'
 import { silentLogger } from '@/tests/silentLogger'
 import { bundledCatalogIndex, bundledManifestRaw } from './bundledCatalog'
-import { ManifestRegistry } from './ManifestRegistry'
+import { ManifestIncompatibleError, ManifestRegistry } from './ManifestRegistry'
 import {
   type IManifestStore,
   type ManifestEntry,
@@ -54,6 +54,7 @@ interface CatalogEntry {
   apiVersion: number
   version: string
   file: string
+  minEngineVersion?: string
 }
 
 function manifestPath(id: string): string {
@@ -1257,5 +1258,138 @@ describe('ManifestRegistry change announcements', () => {
     expect(publishDataChange).toHaveBeenCalledExactlyOnceWith(
       announced(['mine:one'], false)
     )
+  })
+
+  describe('engine compatibility', () => {
+    const needsNewerEngine = {
+      ...makeManifest('future'),
+      minEngineVersion: '99.0.0',
+    }
+
+    it('update skips a catalog entry that needs a newer engine without fetching it', async () => {
+      const fetchMock = stubCatalogFetch(
+        [
+          catalogEntry('good'),
+          { ...catalogEntry('future'), minEngineVersion: '99.0.0' },
+        ],
+        { [manifestPath('good')]: makeManifest('good') }
+      )
+      const registry = new ManifestRegistry(silentLogger, new InMemoryStore())
+      await registry.update()
+
+      expect(nonBundled(await registeredIds(registry))).toEqual(['good'])
+      expect(fileFetches(fetchMock).some((url) => url.includes('future'))).toBe(
+        false
+      )
+    })
+
+    it('update fetches a catalog entry whose minEngineVersion the engine meets', async () => {
+      stubCatalogFetch(
+        [{ ...catalogEntry('old'), minEngineVersion: '0.1.0' }],
+        {
+          [manifestPath('old')]: {
+            ...makeManifest('old'),
+            minEngineVersion: '0.1.0',
+          },
+        }
+      )
+      const registry = new ManifestRegistry(silentLogger, new InMemoryStore())
+      await registry.update()
+
+      expect(nonBundled(await registeredIds(registry))).toEqual(['old'])
+    })
+
+    it('update drops a catalog entry with a malformed minEngineVersion', async () => {
+      stubCatalogFetch(
+        [{ ...catalogEntry('odd'), minEngineVersion: 'soon' }],
+        {}
+      )
+      const registry = new ManifestRegistry(silentLogger, new InMemoryStore())
+
+      expect(await registry.update()).toBe('empty')
+    })
+
+    it('update warns with the version the dropped entry needs', async () => {
+      stubCatalogFetch(
+        [{ ...catalogEntry('future'), minEngineVersion: '99.0.0' }],
+        {}
+      )
+      const warn = vi.spyOn(silentLogger, 'warn')
+      const registry = new ManifestRegistry(silentLogger, new InMemoryStore())
+      await registry.update()
+
+      expect(warn.mock.calls[0]).toContain('future')
+      expect(warn.mock.calls[0]).toContain('99.0.0')
+    })
+
+    it('saveUserManifest refuses a manifest that needs a newer engine and stores nothing', async () => {
+      const store = new InMemoryStore()
+      const registry = new ManifestRegistry(silentLogger, store)
+
+      await expect(
+        registry.saveUserManifest(needsNewerEngine, 'create')
+      ).rejects.toThrow(/99\.0\.0/)
+      expect(await store.get('future')).toBeUndefined()
+    })
+
+    it('saveUserManifest refuses an unsupported apiVersion with a compatibility error', async () => {
+      const registry = new ManifestRegistry(silentLogger, new InMemoryStore())
+
+      await expect(
+        registry.saveUserManifest(makeManifest('mine:v2', 2), 'create')
+      ).rejects.toBeInstanceOf(ManifestIncompatibleError)
+    })
+
+    it('saveUserManifest still reports a malformed manifest as invalid', async () => {
+      const registry = new ManifestRegistry(silentLogger, new InMemoryStore())
+
+      await expect(
+        registry.saveUserManifest({ apiVersion: 1, id: 'bad' }, 'create')
+      ).rejects.toThrow(/invalid manifest/)
+    })
+
+    it('loads the rest and reports an installed manifest that now needs a newer engine', async () => {
+      const store = new InMemoryStore({
+        ok: { manifest: makeManifest('ok'), kind: 'preinstalled' },
+        future: {
+          manifest: { ...needsNewerEngine, name: 'Future source' },
+          kind: 'user',
+        },
+      })
+      const registry = new ManifestRegistry(silentLogger, store)
+
+      expect(await registry.findRunner('ok')).toBeDefined()
+      expect(await registry.findRunner('future')).toBeUndefined()
+      expect(await registry.listIncompatible()).toEqual([
+        {
+          id: 'future',
+          name: 'Future source',
+          version: '1.0.0',
+          incompatibility: {
+            reason: 'engine-version',
+            minEngineVersion: '99.0.0',
+          },
+        },
+      ])
+    })
+
+    it('does not report a malformed stored manifest as incompatible', async () => {
+      const store = new InMemoryStore({
+        broken: { manifest: { apiVersion: 1, id: 'broken' }, kind: 'user' },
+      })
+      const registry = new ManifestRegistry(silentLogger, store)
+
+      expect(await registry.listIncompatible()).toEqual([])
+    })
+
+    it('stops reporting a manifest once it is unregistered', async () => {
+      const store = new InMemoryStore({
+        future: { manifest: needsNewerEngine, kind: 'user' },
+      })
+      const registry = new ManifestRegistry(silentLogger, store)
+      await registry.unregister('future')
+
+      expect(await registry.listIncompatible()).toEqual([])
+    })
   })
 })
