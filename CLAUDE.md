@@ -23,6 +23,7 @@ Biome enforces formatting and imports (`pnpm lint`). Beyond that:
 ## Comments
 
 - Default to no comments. Write one only for a hidden constraint, a subtle invariant, or a workaround, in plain full sentences.
+- No narration of what the next lines do, no history or review notes (`Previously`, `Per review`, `As discussed`), and no defensive justification: if the code looks unreasonable, fix the code. Inside tests too.
 - Never put a ClickUp id (`DA-XXX`) in source, tests, strings or comments. Ids live in commit messages and PR bodies.
 - No em dashes (U+2014) in anything new, including code, commits, PR bodies and every locale file.
 - Every e2e spec has a 3-6 line JSDoc header after the imports, before the first `test()` or `describe()`, saying what it exercises and asserts. For unit tests it is optional.
@@ -42,7 +43,7 @@ The extension is checked in a real Chromium with `build/` loaded, never `dev/chr
 3. Changed translation keys: run `pnpm i18n extract`, translate new `zh` entries, commit the JSON.
 4. Runtime behaviour in the extension: the spec from `verifying-changes` (red before green), plus the affected e2e specs by path.
 5. `pnpm -s fallow audit --base origin/master --skip health`, the audit CI runs. Read the CI log and PR comment too: the check can pass with warnings.
-6. Title `(type) description [DA-XXX]`, type one of `extension`, `app`, `proxy`, `chore`, `docs`. The branch name must carry the same DA id. When `CLICKUP_API_TOKEN` and `CLICKUP_TEAM_ID` are both set, CI also compares the type with the task's Type field in ClickUp. `changeset-release/` branches skip all title checks.
+6. Title `(type) description [DA-XXX]`, type one of `extension`, `app`, `proxy`, `chore`, `docs`. If the branch name has a DA id, it must match the title's. When `CLICKUP_API_TOKEN` and `CLICKUP_TEAM_ID` are both set, CI also compares the type with the task's Type field in ClickUp. `changeset-release/` branches skip all title checks.
 7. A change a user can see gets before and after screenshots in the PR body, and a short clip when it involves motion. Capture steps are in `.claude/commands/da-dev.md`.
 
 Fix failing CI checks on your PR without waiting to be asked.
