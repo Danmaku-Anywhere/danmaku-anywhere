@@ -49,7 +49,7 @@ const NAMESPACE_TOKENS: readonly Newable<DevNamespace>[] = [
   DanmakuRenderNamespace,
 ]
 
-export interface DaApi {
+interface DaApi {
   describe(): NamespaceDescription[]
   help(): NamespaceDescription[]
   providerConfig: ProviderConfigApi
