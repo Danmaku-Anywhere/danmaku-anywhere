@@ -14,7 +14,7 @@ The deciding question for any spec: **if you removed every UI assertion, would t
 
 ## Red before green
 
-A spec that has never failed has not been tested. Before a spec counts as verification, watch it fail against the build *without* the change and pass *with* it. A spec that passes both ways asserts something other than what changed.
+A spec that has never failed has not been tested. Before a spec counts as verification, watch it fail against the build _without_ the change and pass _with_ it. A spec that passes both ways asserts something other than what changed.
 
 Write the spec first where you can, so the "without" build is the current tree. When the change is already written, build the merge base in a throwaway worktree (commands in the `verifying-changes` skill).
 
@@ -173,4 +173,3 @@ Combine three gates, since none alone is sufficient: an error gate (throwing mig
 Use `upgradeToCurrentBuild(context, currentExt)` (`e2e/setup/priorInstall.ts`), not a bare `swapExtension`: it returns once the current popup gets past its upgrade screen, and a spec that reads storage right after a bare swap can catch a half-upgraded store.
 
 Vendored POMs for the prior release's UI live under `e2e/poms/legacy/<version>/` and are frozen. Never share them with current POMs.
-
