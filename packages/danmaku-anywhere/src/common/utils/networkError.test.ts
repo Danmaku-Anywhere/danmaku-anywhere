@@ -20,6 +20,14 @@ describe('isNetworkError', () => {
     expect(isNetworkError(new RpcException('Failed to fetch'))).toBe(true)
   })
 
+  it('matches the manifest engine NetworkError message', () => {
+    expect(
+      isNetworkError(
+        new RpcException('network request failed for https://a.b/c')
+      )
+    ).toBe(true)
+  })
+
   it('leaves other errors alone', () => {
     expect(isNetworkError(new Error('HTTP 500'))).toBe(false)
     expect(
