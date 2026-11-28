@@ -30,41 +30,7 @@ goes green immediately. Do not weaken an assertion to manufacture a red.
 
 ## Which tier to run
 
-From `packages/danmaku-anywhere`:
-
-```bash
-pnpm lint                # tsc + biome + the spec theatre lint
-pnpm test:e2e:changed    # inner loop: specs you edited
-pnpm test:e2e:smoke      # ~7s band: install, mount, search
-pnpm test:e2e:ui         # human only: Playwright UI mode, needs a display
-pnpm test:e2e:verify <spec>   # evidence run: full trace + HTML report
-```
-
-The suite loads `build/`, not your source. Playwright refuses to run against a stale build and
-prints the command, so if you changed product code, build first:
-
-```bash
-VITE_DA_ENV=e2e pnpm run build
-```
-
-**Never run the full suite locally.** `pnpm test:e2e` is CI's job. Run the affected specs, and at
-most the smoke band on top. A full local sweep is slow, contends for the machine, and flakes under
-that contention, so its red tells you little.
-
-**`--only-changed` only follows direct imports.** Measured here: `setup/fixtures.ts` selects 50
-files, `pom/Popup.ts` selects 40, but `pom/SearchPage.ts` reached through `Popup` selects 1, and a
-content script the specs never import selects 0. Specs that import product source directly do get
-picked up, but anything reaching a spec only through the built extension is invisible.
-
-It under-selects silently, and an empty selection looks identical to a clean one. After touching a
-leaf POM or product code, run the covering specs by path:
-
-```bash
-pnpm exec playwright test e2e/specs/<area>/<spec>.spec.ts
-```
-
-Unit and package tests: `pnpm --filter <package> test`, or
-`pnpm --filter '...[origin/master]' test` for a cross-cutting change.
+Which specs to run, the stale-build rule and the `--only-changed` limits are in `packages/danmaku-anywhere/e2e/AGENTS.md` ("Which tests to run"). Never run the full suite locally. Unit and package tests: `pnpm --filter <package> test`, or `pnpm --filter '...[origin/master]' test` for a cross-cutting change.
 
 ## Getting a build without your change
 
@@ -76,7 +42,7 @@ cd ../da-base && pnpm install --frozen-lockfile && pnpm build:packages
 cd packages/danmaku-anywhere && VITE_DA_ENV=e2e pnpm run build
 ```
 
-About 35s of building, measured. Copy the spec in, watch it fail, throw the worktree away.
+Copy the spec in, watch it fail, throw the worktree away.
 
 ## What to record
 
@@ -90,14 +56,5 @@ In the PR's Test plan, one line each. This is a record of what you did, not a se
 
 ## Gotchas that waste a loop
 
-- **The build must match the tree.** `globalSetup` refuses a stale or wrong-env `build/`, and
-  `pnpm run verify:explore` repairs it. If a spec behaves impossibly, check that first.
-- **Sibling worktrees exist.** Use absolute paths; a relative `cd` can land you in another
-  checkout and your edits will appear to vanish.
-- **Extensions need `build/`**, not `dev/chrome`. The latter is the human's `pnpm dev:browser`
-  lane and the agent never touches it.
-
-## Canonical doctrine
-
-`packages/danmaku-anywhere/e2e/AGENTS.md` owns the e2e rules and auto-loads when you work in that
-directory. This skill is the entry point; that file is the authority.
+- If a spec behaves impossibly, check that `build/` matches the tree: `pnpm run verify:explore` repairs it.
+- Sibling worktrees exist. Use absolute paths; a relative `cd` can land you in another checkout and your edits will appear to vanish.
