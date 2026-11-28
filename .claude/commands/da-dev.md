@@ -44,6 +44,7 @@ Reuse an existing worktree if its previous work is done.
 Make the changes. Apply these:
 
 - **CLAUDE.md conventions** are non-negotiable.
+- **KISS and YAGNI**: the simplest thing that solves the actual task. No fallback for inputs that cannot happen, no helper or constant used once, no knob or parameter this PR does not need.
 - **Library idioms**: check whether the framework already exposes the primitive before writing a helper. For unfamiliar APIs or recent versions, fetch current docs via the `context7` MCP. Match the project's existing usage.
 - **e2e coverage**: every feature/fix lands with e2e coverage under `packages/danmaku-anywhere/e2e/` unless coverage is genuinely infeasible. State *why* in the PR body when skipping. Use `browser-verify` while authoring the spec.
 - **Committed agent docs stay portable.** Files under `.claude/`, `CLAUDE.md`, `AGENTS.md` must not contain absolute paths into a developer's machine, OS-specific commands without an alternative, or project-specific magic values. Workspace-specific values (ClickUp IDs, browser executable paths, etc.) live in environment variables (e.g. `CLICKUP_DA_*`) that the developer sets in their shell, not in committed files; env vars are inherited across worktrees, unlike per-project agent memory. If a workflow depends on an MCP or local tool that may not be present, declare the prerequisite so the agent can stop and tell the human on a miss.

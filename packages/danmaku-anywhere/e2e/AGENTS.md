@@ -75,7 +75,6 @@ The standard shape:
 4. Assert state: ground truth in DB / chrome.storage (optional but encouraged)
 ```
 
-
 ## Comments
 
 Header JSDoc and the default-to-no-comments rule are in the root `CLAUDE.md`. In test bodies, POMs and setup files a comment earns its place only for a known race, a library bug, a CDP delivery quirk or an envelope constraint (the eager watcher attach in `fixtures.ts` is an example), and it names what is broken.
@@ -161,7 +160,7 @@ The smoke seeds state by driving v1.5.0's own popup UI through `e2e/poms/legacy/
 - `addTitleMapping(snapshot)` sends v1.5.0's `seasonMapAdd` RPC because v1.5.0 only creates a seasonMap row from the content script's floating panel.
 - `backup.json.gz` (under `e2e/fixtures/migration/`) must be an export from v1.5.0 itself. An export from a later build is restored verbatim by v1.5.0, and the migration steps in between then never run.
 
-Regenerate `backup.json.gz` with `pnpm exec playwright test --config e2e/fixture-gen/playwright.config.ts`; the migration specs assert on the values in `v150Backup.gen.ts`, so change both together. Regenerate `danmaku.zip` with `scripts/prepareMigrationFixtures.mjs <export-root>`.
+Regenerate `backup.json.gz` with `pnpm exec playwright test --config e2e/fixture-gen/playwright.config.ts`; the migration specs assert on the values in `v150Backup.gen.ts`, so change both together. Regenerate `danmaku.zip` with `scripts/prepareMigrationFixtures.mjs <export-root>`. The script renames entries so filenames do not leak watch history; keep it that way, since the repo is public.
 
 ### Asserting post-swap
 
