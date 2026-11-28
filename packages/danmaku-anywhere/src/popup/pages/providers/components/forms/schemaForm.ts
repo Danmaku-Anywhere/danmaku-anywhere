@@ -1,8 +1,11 @@
-import type { ConfigSchema } from '@mr-quin/dango'
+import {
+  type ConfigIssue,
+  type ConfigSchema,
+  validateConfig,
+} from '@mr-quin/dango'
 import { i18n } from '@/common/localization/i18n'
 import { isBuiltinConfig } from '@/common/options/providerConfig/displayName'
 import type { ProviderConfig } from '@/common/options/providerConfig/schema'
-import { tryCatchSync } from '@/common/utils/tryCatch'
 
 export type FieldKind =
   | 'text'
@@ -209,99 +212,6 @@ export function buildDefaultValues(
   return out
 }
 
-function isEmptyValue(value: unknown): boolean {
-  return value === undefined || value === null || value === ''
-}
-
-function numberConstraint(
-  schema: ConfigSchema,
-  key: string
-): number | undefined {
-  const value = schema[key]
-  return typeof value === 'number' ? value : undefined
-}
-
-function validateString(schema: ConfigSchema, value: string): string | null {
-  const minLength = numberConstraint(schema, 'minLength')
-  if (minLength !== undefined && value.length < minLength) {
-    return i18n.t(
-      'providers.editor.validation.minLength',
-      'Must be at least {{min}} characters',
-      { min: minLength }
-    )
-  }
-  const maxLength = numberConstraint(schema, 'maxLength')
-  if (maxLength !== undefined && value.length > maxLength) {
-    return i18n.t(
-      'providers.editor.validation.maxLength',
-      'Must be at most {{max}} characters',
-      { max: maxLength }
-    )
-  }
-  const pattern = schema.pattern
-  if (typeof pattern === 'string' && pattern.length > 0) {
-    const [regex] = tryCatchSync(() => new RegExp(pattern))
-    if (regex && !regex.test(value)) {
-      return i18n.t(
-        'providers.editor.validation.pattern',
-        'Must match the pattern {{pattern}}',
-        { pattern }
-      )
-    }
-  }
-  if (schema.format === 'uri' || schema.format === 'url') {
-    const [, error] = tryCatchSync(() => new URL(value))
-    if (error) {
-      return i18n.t('providers.editor.validation.url', 'Not a valid URL')
-    }
-  }
-  return null
-}
-
-function validateNumber(schema: ConfigSchema, value: number): string | null {
-  const minimum = numberConstraint(schema, 'minimum')
-  if (minimum !== undefined && value < minimum) {
-    return i18n.t(
-      'providers.editor.validation.minimum',
-      'Must be at least {{min}}',
-      { min: minimum }
-    )
-  }
-  const maximum = numberConstraint(schema, 'maximum')
-  if (maximum !== undefined && value > maximum) {
-    return i18n.t(
-      'providers.editor.validation.maximum',
-      'Must be at most {{max}}',
-      { max: maximum }
-    )
-  }
-  if (schema.type === 'integer' && !Number.isInteger(value)) {
-    return i18n.t(
-      'providers.editor.validation.integer',
-      'Must be a whole number'
-    )
-  }
-  return null
-}
-
-// Empty values are valid here; `required` is enforced separately so optional
-// fields can stay blank without tripping their constraints.
-export function validateScalar(
-  schema: ConfigSchema,
-  value: unknown
-): string | null {
-  if (isEmptyValue(value)) {
-    return null
-  }
-  if (typeof value === 'string') {
-    return validateString(schema, value)
-  }
-  if (typeof value === 'number') {
-    return validateNumber(schema, value)
-  }
-  return null
-}
-
 export interface ConfigValueError {
   path: string
   message: string
@@ -311,121 +221,148 @@ function joinPath(path: string, key: string): string {
   return path === '' ? key : `${path}.${key}`
 }
 
-function collectErrors(
-  schema: ConfigSchema,
-  value: unknown,
-  path: string,
-  errors: ConfigValueError[]
-): void {
-  switch (getFieldKind(schema)) {
-    case 'object': {
-      collectObjectErrors(schema, isRecord(value) ? value : {}, path, errors)
-      return
-    }
-    case 'array': {
-      const itemSchema = schema.items
-      if (!itemSchema || !Array.isArray(value)) {
-        return
-      }
-      value.forEach((item, index) => {
-        collectErrors(itemSchema, item, joinPath(path, String(index)), errors)
-      })
-      return
-    }
-    default: {
-      const message = validateScalar(schema, value)
-      if (message) {
-        errors.push({ path, message })
-      }
-    }
-  }
-}
-
-// `anyOf: [{ required: [...] }, ...]` on an object: at least one of the key
-// sets has to be filled in, e.g. a server URL or a pair of credentials.
-function requiredAlternatives(schema: ConfigSchema): string[][] {
-  if (!Array.isArray(schema.anyOf)) {
-    return []
-  }
-  const alternatives: string[][] = []
-  for (const branch of schema.anyOf) {
-    if (!isRecord(branch) || !Array.isArray(branch.required)) {
-      return []
-    }
-    const keys = branch.required.filter(
-      (key): key is string => typeof key === 'string'
-    )
-    if (keys.length === 0) {
-      return []
-    }
-    alternatives.push(keys)
-  }
-  return alternatives
-}
-
 function fieldTitle(schema: ConfigSchema, key: string): string {
   const title = schema.properties?.[key]?.title
   return typeof title === 'string' && title.length > 0 ? title : key
 }
 
-function collectAlternativeErrors(
+function schemaAt(
   schema: ConfigSchema,
-  record: Record<string, unknown>,
-  path: string,
-  errors: ConfigValueError[]
-): void {
-  const alternatives = requiredAlternatives(schema)
-  if (alternatives.length === 0) {
-    return
+  path: (string | number)[]
+): ConfigSchema | undefined {
+  let node: ConfigSchema | undefined = schema
+  for (const step of path) {
+    node =
+      typeof step === 'number' ? node?.items : node?.properties?.[String(step)]
   }
-  const satisfied = alternatives.some((keys) =>
-    keys.every((key) => !isEmptyValue(record[key]))
-  )
-  if (satisfied) {
-    return
+  return node
+}
+
+function valueAt(value: unknown, path: (string | number)[]): unknown {
+  let node = value
+  for (const step of path) {
+    if (node === null || typeof node !== 'object') {
+      return undefined
+    }
+    node = (node as Record<string | number, unknown>)[step]
   }
+  return node
+}
+
+function alternativesMessage(
+  node: ConfigSchema | undefined,
+  alternatives: string[][]
+): string {
   const language = i18n.language
   const and = new Intl.ListFormat(language, { type: 'conjunction' })
   const or = new Intl.ListFormat(language, { type: 'disjunction' })
   const fields = or.format(
     alternatives.map((keys) =>
-      and.format(keys.map((key) => fieldTitle(schema, key)))
+      and.format(keys.map((key) => (node ? fieldTitle(node, key) : key)))
     )
   )
-  const message = i18n.t(
+  return i18n.t(
     'providers.editor.validation.requiredAlternatives',
     'Fill in {{fields}}',
     { fields }
   )
-  const [firstKey] = alternatives[0]
-  errors.push({ path: joinPath(path, firstKey), message })
 }
 
-function collectObjectErrors(
+// Codes without a message here (enum, type other than integer, array bounds,
+// additionalProperties, a pattern that is not a regex) are not shown to the
+// user: the form inputs cannot produce them and a schema mistake is not
+// something the user can fix.
+function issueMessage(
+  issue: ConfigIssue,
   schema: ConfigSchema,
-  record: Record<string, unknown>,
-  path: string,
-  errors: ConfigValueError[]
-): void {
-  collectAlternativeErrors(schema, record, path, errors)
-  const required = new Set(schema.required ?? [])
-  for (const [key, propSchema] of Object.entries(schema.properties ?? {})) {
-    const childPath = joinPath(path, key)
-    const childValue = record[key]
-    if (isEmptyValue(childValue)) {
-      if (required.has(key)) {
-        errors.push({
-          path: childPath,
-          message: i18n.t(
-            'providers.editor.validation.required',
-            'This field is required'
-          ),
-        })
+  values: unknown
+): string | null {
+  const { min, max, pattern } = issue.params ?? {}
+  switch (issue.code) {
+    case 'required':
+      return i18n.t(
+        'providers.editor.validation.required',
+        'This field is required'
+      )
+    case 'requiredAlternatives':
+      return alternativesMessage(
+        schemaAt(schema, issue.path),
+        alternativesOf(issue)
+      )
+    case 'minLength':
+      return i18n.t(
+        'providers.editor.validation.minLength',
+        'Must be at least {{min}} characters',
+        { min }
+      )
+    case 'maxLength':
+      return i18n.t(
+        'providers.editor.validation.maxLength',
+        'Must be at most {{max}} characters',
+        { max }
+      )
+    case 'pattern':
+      return i18n.t(
+        'providers.editor.validation.pattern',
+        'Must match the pattern {{pattern}}',
+        { pattern }
+      )
+    case 'format':
+      return i18n.t('providers.editor.validation.url', 'Not a valid URL')
+    case 'minimum':
+      return i18n.t(
+        'providers.editor.validation.minimum',
+        'Must be at least {{min}}',
+        { min }
+      )
+    case 'maximum':
+      return i18n.t(
+        'providers.editor.validation.maximum',
+        'Must be at most {{max}}',
+        { max }
+      )
+    case 'type':
+      if (
+        issue.params?.expected === 'integer' &&
+        typeof valueAt(values, issue.path) === 'number'
+      ) {
+        return i18n.t(
+          'providers.editor.validation.integer',
+          'Must be a whole number'
+        )
       }
-      continue
-    }
-    collectErrors(propSchema, childValue, childPath, errors)
+      return null
+    default:
+      return null
   }
+}
+
+function isDeclaredRequirement(
+  issue: ConfigIssue,
+  schema: ConfigSchema
+): boolean {
+  if (issue.code !== 'required') {
+    return true
+  }
+  const key = String(issue.path[issue.path.length - 1])
+  return (
+    schemaAt(schema, issue.path.slice(0, -1))?.properties?.[key] !== undefined
+  )
+}
+
+// Empty values are valid here; `required` is enforced separately so optional
+// fields can stay blank without tripping their constraints.
+export function validateScalar(
+  schema: ConfigSchema,
+  value: unknown
+): string | null {
+  for (const issue of validateConfig(schema, value)) {
+    const message = issueMessage(issue, schema, value)
+    if (message) {
+      return message
+    }
+  }
+  return null
 }
 
 export function validateConfigValues(
@@ -436,8 +373,35 @@ export function validateConfigValues(
     return []
   }
   const errors: ConfigValueError[] = []
-  collectObjectErrors(schema, values, '', errors)
+  const reported = new Set<string>()
+  for (const issue of validateConfig(schema, values)) {
+    const issuePath = `${issue.code === 'requiredAlternatives' ? 'alt:' : ''}${issue.path.join('.')}`
+    const message = issueMessage(issue, schema, values)
+    if (
+      !message ||
+      reported.has(issuePath) ||
+      !isDeclaredRequirement(issue, schema)
+    ) {
+      continue
+    }
+    reported.add(issuePath)
+    errors.push({ path: errorPath(issue), message })
+  }
   return errors
+}
+
+function alternativesOf(issue: ConfigIssue): string[][] {
+  const alternatives = issue.params?.alternatives
+  return Array.isArray(alternatives) ? (alternatives as string[][]) : []
+}
+
+function errorPath(issue: ConfigIssue): string {
+  const path = issue.path.join('.')
+  if (issue.code !== 'requiredAlternatives') {
+    return path
+  }
+  const [firstKey] = alternativesOf(issue)[0] ?? []
+  return firstKey === undefined ? path : joinPath(path, firstKey)
 }
 
 // Schema fields fully replace their stored values, but stored keys the schema
