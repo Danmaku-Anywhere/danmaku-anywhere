@@ -14,10 +14,10 @@
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
   "scripts": {
-    "build": "tsgo",
+    "build": "tsc",
     "lint": "biome check --fix",
     "test": "vitest run",
-    "type-check": "tsgo --noEmit"
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@danmaku-anywhere/extension-protocol": "workspace:^",

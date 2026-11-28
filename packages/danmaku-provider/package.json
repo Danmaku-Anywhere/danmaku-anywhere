@@ -58,11 +58,11 @@
   "scripts": {
     "test": "vitest run",
     "protobuf:compile": "pbjs -t static-module -w es6 -o src/protobuf/protobuf.js src/protobuf/definition/bilibili.dm.proto && pbts -o src/protobuf/protobuf.d.ts src/protobuf/protobuf.js",
-    "build": "pnpm protobuf:compile && tsgo && node -e \"for (const f of ['protobuf.js', 'protobuf.d.ts']) { require('node:fs').cpSync('src/protobuf/' + f, 'dist/src/protobuf/' + f) }\"",
-    "lint": "tsgo && biome check --fix",
+    "build": "pnpm protobuf:compile && tsc && node -e \"for (const f of ['protobuf.js', 'protobuf.d.ts']) { require('node:fs').cpSync('src/protobuf/' + f, 'dist/src/protobuf/' + f) }\"",
+    "lint": "tsc && biome check --fix",
     "lint:ci": "biome ci",
-    "type-check": "tsgo --noEmit",
-    "dev": "tsgo -w",
+    "type-check": "tsc --noEmit",
+    "dev": "tsc -w",
     "openapi-ts": "openapi-ts"
   },
   "dependencies": {

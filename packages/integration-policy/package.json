@@ -30,9 +30,9 @@
     }
   },
   "scripts": {
-    "build": "tsgo -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json",
     "lint": "biome check --fix",
-    "type-check": "tsgo --noEmit",
+    "type-check": "tsc --noEmit",
     "test": "vitest run"
   },
   "peerDependencies": {

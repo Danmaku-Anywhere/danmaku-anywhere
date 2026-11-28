@@ -32,11 +32,11 @@
   },
   "scripts": {
     "test": "vitest run",
-    "build": "tsgo",
-    "lint": "tsgo && biome check --fix",
+    "build": "tsc",
+    "lint": "tsc && biome check --fix",
     "lint:ci": "biome ci",
-    "type-check": "tsgo --noEmit",
-    "dev": "tsgo -w"
+    "type-check": "tsc --noEmit",
+    "dev": "tsc -w"
   },
   "dependencies": {
     "xml-js": "^1.6.11"
