@@ -47,7 +47,7 @@ describe('commentsToXml', () => {
     const result = commentsToXml(comments)
 
     expect(result).toContain(
-      'Text with &lt;tag&gt; &amp; "quotes" &amp; \'apostrophes\''
+      'Text with &lt;tag&gt; &amp; &quot;quotes&quot; &amp; &apos;apostrophes&apos;'
     )
   })
 

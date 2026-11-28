@@ -1,5 +1,5 @@
-import { xml2json } from 'xml-js'
 import { z } from 'zod'
+import { parseXml } from './xml.js'
 
 export const stripHtml = (html: string) => {
   const reg = /<(?:"[^"]*"['"]*|'[^']*'['"]*|[^'">])+>/g
@@ -15,7 +15,7 @@ export const rgb888ToHex = (rgb: number) => {
 }
 
 export const xmlToJSON = (xml: string) => {
-  return JSON.parse(xml2json(xml, { compact: true }))
+  return parseXml(xml)
 }
 
 export const zHex = z

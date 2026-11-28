@@ -1,25 +1,25 @@
-import { js2xml } from 'xml-js'
 import type { CommentEntity } from '../canonical/index.js'
+import { buildXml } from './xml.js'
 
 /**
- * Convert comments to XML format compatible with DanDanPlay using json2xml
+ * Convert comments to XML format compatible with DanDanPlay
  */
 export const commentsToXml = (comments: CommentEntity[]) => {
   const xmlStructure = {
-    _declaration: {
+    '?xml': {
       _attributes: {
         version: '1.0',
         encoding: 'UTF-8',
       },
     },
     i: {
-      chatserver: { _text: 'chat.bilibili.com' },
-      chatid: { _text: '0' },
-      mission: { _text: '0' },
-      maxlimit: { _text: comments.length.toString() },
-      state: { _text: '0' },
-      real_name: { _text: '0' },
-      source: { _text: 'k-v' },
+      chatserver: 'chat.bilibili.com',
+      chatid: '0',
+      mission: '0',
+      maxlimit: comments.length.toString(),
+      state: '0',
+      real_name: '0',
+      source: 'k-v',
       d: comments.map((comment) => {
         const pParts = comment.p.split(',')
         const [time, mode, color, ...rest] = pParts
@@ -45,5 +45,5 @@ export const commentsToXml = (comments: CommentEntity[]) => {
     },
   }
 
-  return js2xml(xmlStructure, { compact: true, spaces: 4 })
+  return buildXml(xmlStructure)
 }
