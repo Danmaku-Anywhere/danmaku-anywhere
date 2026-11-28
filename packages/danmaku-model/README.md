@@ -5,15 +5,3 @@ The shared danmaku data model: comment, episode, season, bookmark and provider s
 ## Usage
 
 Consumed by `danmaku-engine`, `danmaku-provider`, `extension-protocol`, the extension and the web app.
-
-## Scripts
-
-| Command      | Description       |
-| ------------ | ----------------- |
-| `pnpm build` | Compile with tsgo |
-| `pnpm test`  | Vitest            |
-| `pnpm dev`   | Watch build       |
-
-## Dependencies
-
-- `xml-js`, `zod`
