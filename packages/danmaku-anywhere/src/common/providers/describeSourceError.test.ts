@@ -27,16 +27,16 @@ describe('describeSourceError', () => {
     ['searchUnsupported', 'providers.error.searchUnsupported'],
     ['danmakuUnsupported', 'providers.error.danmakuUnsupported'],
     ['seasonRefreshUnsupported', 'providers.error.seasonRefreshUnsupported'],
-  ] satisfies [
-    SourceProblem,
-    string,
-  ][])('translates a %s error after it crosses the RPC boundary', (problem, key) => {
-    const error = acrossRpc(
-      new SourceError(problem, 'raw background message', 'Bilibili')
-    )
+  ] satisfies [SourceProblem, string][])(
+    'translates a %s error after it crosses the RPC boundary',
+    (problem, key) => {
+      const error = acrossRpc(
+        new SourceError(problem, 'raw background message', 'Bilibili')
+      )
 
-    expect(describeSourceError(error)).toBe(key)
-  })
+      expect(describeSourceError(error)).toBe(key)
+    }
+  )
 
   it('keeps the message of an unrelated error', () => {
     const error = acrossRpc(new Error('network down'))

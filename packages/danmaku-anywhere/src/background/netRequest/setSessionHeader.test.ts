@@ -35,7 +35,7 @@ describe('setSessionHeader', () => {
       },
     })
 
-    container.rebindSync(ExtensionOptionsService).toConstantValue({
+    container.rebind(ExtensionOptionsService).toConstantValue({
       get: vi.fn().mockResolvedValue({}),
     } as any)
   })
@@ -109,7 +109,7 @@ describe('setSessionHeader', () => {
   it('should respect useInitiatorDomains option', async () => {
     // Test default/true
     {
-      container.rebindSync(ExtensionOptionsService).toConstantValue({
+      container.rebind(ExtensionOptionsService).toConstantValue({
         get: vi.fn().mockResolvedValue({}),
       } as any)
 
@@ -121,7 +121,7 @@ describe('setSessionHeader', () => {
 
     // Test false
     {
-      container.rebindSync(ExtensionOptionsService).toConstantValue({
+      container.rebind(ExtensionOptionsService).toConstantValue({
         get: vi.fn().mockResolvedValue({ restrictInitiatorDomain: false }),
       } as any)
 

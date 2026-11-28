@@ -1,4 +1,4 @@
-import type { Container } from 'inversify'
+import type { Container, Newable } from 'inversify'
 import {
   type BookmarkApi,
   BookmarkNamespace,
@@ -32,11 +32,12 @@ import {
 import {
   buildRegistry,
   type DaEnv,
+  type DevNamespace,
   type NamespaceDescription,
   type Registry,
 } from './registry'
 
-const NAMESPACE_TOKENS = [
+const NAMESPACE_TOKENS: readonly Newable<DevNamespace>[] = [
   ProviderConfigNamespace,
   StorageNamespace,
   ExtensionOptionsNamespace,
@@ -46,9 +47,9 @@ const NAMESPACE_TOKENS = [
   BookmarkNamespace,
   MountNamespace,
   DanmakuRenderNamespace,
-] as const
+]
 
-export interface DaApi {
+interface DaApi {
   describe(): NamespaceDescription[]
   help(): NamespaceDescription[]
   providerConfig: ProviderConfigApi

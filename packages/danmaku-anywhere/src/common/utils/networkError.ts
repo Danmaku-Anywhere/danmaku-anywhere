@@ -1,8 +1,9 @@
 // What fetch rejects with when the host cannot be reached, per engine
-// (Chromium, Firefox, Safari). The RPC hop rewraps the error in an
-// RpcException, so the message is what is left to match.
+// (Chromium, Firefox, Safari), or the manifest engine's NetworkError wrapping
+// it. The RPC hop rewraps the error in an RpcException, so the message is what
+// is left to match.
 const NETWORK_ERROR_MESSAGE =
-  /^(TypeError: )?(Failed to fetch|NetworkError when attempting to fetch resource\.?|Load failed)$/
+  /^(TypeError: )?(Failed to fetch|NetworkError when attempting to fetch resource\.?|Load failed)$|^network request failed for /
 
 export function isNetworkError(error: unknown): boolean {
   if (!(error instanceof Error)) {

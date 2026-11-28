@@ -125,27 +125,26 @@ describe('EpisodeToast', () => {
   })
 
   describe('a run that reports after a newer run started', () => {
-    it.each([
-      'success',
-      'error',
-      'warning',
-    ] as const)('ignores a late %s', (severity) => {
-      const first = runs.begin()
-      toast.progress(first, 'Finding episode 1')
-      vi.advanceTimersByTime(1500)
-      runs.end()
-      toast.progress(runs.begin(), 'Finding episode 2')
-      vi.advanceTimersByTime(1500)
+    it.each(['success', 'error', 'warning'] as const)(
+      'ignores a late %s',
+      (severity) => {
+        const first = runs.begin()
+        toast.progress(first, 'Finding episode 1')
+        vi.advanceTimersByTime(1500)
+        runs.end()
+        toast.progress(runs.begin(), 'Finding episode 2')
+        vi.advanceTimersByTime(1500)
 
-      toast.report(first, severity, 'Episode 1 result')
+        toast.report(first, severity, 'Episode 1 result')
 
-      expect(openToasts()).toEqual([
-        expect.objectContaining({
-          severity: 'info',
-          message: 'Finding episode 2',
-        }),
-      ])
-    })
+        expect(openToasts()).toEqual([
+          expect.objectContaining({
+            severity: 'info',
+            message: 'Finding episode 2',
+          }),
+        ])
+      }
+    )
 
     it('leaves the newer progress pending while it waits for the delay', () => {
       const first = runs.begin()

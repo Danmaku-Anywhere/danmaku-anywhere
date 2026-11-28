@@ -18,10 +18,11 @@ describe('option store descriptors', () => {
     expect(stores.map((store) => store.descriptor)).toEqual(OPTION_STORES)
   })
 
-  it.each(
-    stores.map((store) => [store.name, store] as const)
-  )('match the %s service', (_, store) => {
-    expect(store.options.key).toBe(store.descriptor.key)
-    expect(store.options.latestVersion).toBe(store.descriptor.latestVersion)
-  })
+  it.each(stores.map((store) => [store.name, store] as const))(
+    'match the %s service',
+    (_, store) => {
+      expect(store.options.key).toBe(store.descriptor.key)
+      expect(store.options.latestVersion).toBe(store.descriptor.latestVersion)
+    }
+  )
 })

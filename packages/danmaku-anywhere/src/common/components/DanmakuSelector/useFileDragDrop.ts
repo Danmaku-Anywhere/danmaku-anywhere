@@ -2,7 +2,7 @@ import { useEventCallback } from '@mui/material'
 import { type DragEvent, useMemo, useState } from 'react'
 
 async function readAllEntries(
-  directoryReader: DirectoryReader
+  directoryReader: FileSystemDirectoryReader
 ): Promise<FileSystemEntry[]> {
   const allEntries: FileSystemEntry[] = []
   let entries: FileSystemEntry[] = []

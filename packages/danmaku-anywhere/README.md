@@ -10,15 +10,15 @@ Browser extension that adds danmaku (bullet comments) to video sites (Plex, Jell
 
 ## Scripts
 
-| Command | Description |
-| ------- | ----------- |
-| `pnpm dev` | Dev server (Chrome) |
-| `pnpm dev:firefox` | Dev build for Firefox |
-| `pnpm build` | Production build to `build/` |
-| `pnpm build:firefox` | Production build for Firefox |
-| `pnpm standalone:dev` | Standalone web app dev |
-| `pnpm test` | Vitest |
-| `pnpm lint` | TypeScript + Biome |
+| Command               | Description                  |
+| --------------------- | ---------------------------- |
+| `pnpm dev`            | Dev server (Chrome)          |
+| `pnpm dev:firefox`    | Dev build for Firefox        |
+| `pnpm build`          | Production build to `build/` |
+| `pnpm build:firefox`  | Production build for Firefox |
+| `pnpm standalone:dev` | Standalone web app dev       |
+| `pnpm test`           | Vitest                       |
+| `pnpm lint`           | TypeScript + Biome           |
 
 ## Workspace Dependencies
 

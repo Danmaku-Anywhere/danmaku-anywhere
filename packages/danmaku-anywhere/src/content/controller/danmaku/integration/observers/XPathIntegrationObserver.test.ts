@@ -86,18 +86,21 @@ describe('XPathIntegrationObserver', () => {
   it.each([
     ['reset', (o: XPathIntegrationObserver) => o.reset()],
     ['destroy', (o: XPathIntegrationObserver) => o.destroy()],
-  ])('reports only the cleared media for discovery that finishes after a %s', async (_, stop) => {
-    const events = record(observer)
-    const observe = vi.spyOn(MutationObserver.prototype, 'observe')
+  ])(
+    'reports only the cleared media for discovery that finishes after a %s',
+    async (_, stop) => {
+      const events = record(observer)
+      const observe = vi.spyOn(MutationObserver.prototype, 'observe')
 
-    observer.run()
-    vi.advanceTimersByTime(1000)
-    stop(observer)
-    await vi.advanceTimersByTimeAsync(0)
+      observer.run()
+      vi.advanceTimersByTime(1000)
+      stop(observer)
+      await vi.advanceTimersByTimeAsync(0)
 
-    expect(events).toEqual(['mediaCleared'])
-    expect(observe).not.toHaveBeenCalled()
-  })
+      expect(events).toEqual(['mediaCleared'])
+      expect(observe).not.toHaveBeenCalled()
+    }
+  )
 
   it('reports the media again once a failed extraction recovers', async () => {
     const events = record(observer)

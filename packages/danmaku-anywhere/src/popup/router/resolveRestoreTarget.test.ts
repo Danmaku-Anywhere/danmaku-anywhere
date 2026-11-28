@@ -31,15 +31,12 @@ describe('resolveRestoreTarget', () => {
     expect(resolve(persisted)).toEqual({ kind: 'restore', path: expected })
   })
 
-  it.each([
-    undefined,
-    '',
-    '/',
-    POPUP_DEFAULT_ROUTE,
-    42,
-  ])('restores nothing for %s', (persisted) => {
-    expect(resolve(persisted)).toEqual({ kind: 'none' })
-  })
+  it.each([undefined, '', '/', POPUP_DEFAULT_ROUTE, 42])(
+    'restores nothing for %s',
+    (persisted) => {
+      expect(resolve(persisted)).toEqual({ kind: 'none' })
+    }
+  )
 
   it('reports an unknown route as invalid', () => {
     expect(resolve('/this/does/not/exist')).toEqual({ kind: 'invalid' })
@@ -51,11 +48,10 @@ describe('hasExplicitRoute', () => {
     expect(hasExplicitRoute(hash)).toBe(false)
   })
 
-  it.each([
-    '#/options/help',
-    '#/mount',
-    '#/search/season',
-  ])('treats %s as an explicit route', (hash) => {
-    expect(hasExplicitRoute(hash)).toBe(true)
-  })
+  it.each(['#/options/help', '#/mount', '#/search/season'])(
+    'treats %s as an explicit route',
+    (hash) => {
+      expect(hasExplicitRoute(hash)).toBe(true)
+    }
+  )
 })

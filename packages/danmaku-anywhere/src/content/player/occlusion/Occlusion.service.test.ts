@@ -355,25 +355,28 @@ describe('OcclusionService segment failures', () => {
   it.each([
     ['returns no result', () => Promise.resolve(null)],
     ['throws', () => Promise.reject(new Error('segmenter failed'))],
-  ])('stops with a segment status once the segmenter %s on five frames in a row', async (_, segment) => {
-    const provider: MaskProvider = {
-      init: () => Promise.resolve(),
-      segment,
+  ])(
+    'stops with a segment status once the segmenter %s on five frames in a row',
+    async (_, segment) => {
+      const provider: MaskProvider = {
+        init: () => Promise.resolve(),
+        segment,
+      }
+      const { service, video, statuses } = startLoop(provider)
+
+      await frames(video, 4)
+      expect(statuses).toEqual([])
+      expect(service.getStats().running).toBe(true)
+
+      await frames(video, 1)
+      expect(statuses.map((s) => s.reason)).toEqual(['segment'])
+      expect(service.getStats().running).toBe(false)
+
+      const requestFrame = vi.spyOn(video, 'requestVideoFrameCallback')
+      await frames(video, 2)
+      expect(requestFrame).not.toHaveBeenCalled()
     }
-    const { service, video, statuses } = startLoop(provider)
-
-    await frames(video, 4)
-    expect(statuses).toEqual([])
-    expect(service.getStats().running).toBe(true)
-
-    await frames(video, 1)
-    expect(statuses.map((s) => s.reason)).toEqual(['segment'])
-    expect(service.getStats().running).toBe(false)
-
-    const requestFrame = vi.spyOn(video, 'requestVideoFrameCallback')
-    await frames(video, 2)
-    expect(requestFrame).not.toHaveBeenCalled()
-  })
+  )
 
   it('keeps running when a good frame breaks a run of failures', async () => {
     const results = [null, null, null, null, okResult, null, null, null, null]

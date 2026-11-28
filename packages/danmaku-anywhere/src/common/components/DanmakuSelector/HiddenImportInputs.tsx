@@ -35,7 +35,6 @@ export function HiddenImportInputs({
         hidden
         ref={folderInputRef}
         onChange={handleChange}
-        // @ts-expect-error non-standard attribute, but allows selecting folder to upload
         webkitdirectory=""
       />
     </>

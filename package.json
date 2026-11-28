@@ -26,13 +26,13 @@
     "fallow": "fallow"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.15",
+    "@biomejs/biome": "^2.6.9",
     "@changesets/cli": "^3.0.3",
-    "@typescript/native-preview": "7.0.0-dev.20260521.1",
-    "fallow": "3.43.2",
-    "knip": "6.41.0",
-    "lefthook": "^2.2.1",
-    "typescript": "^6.0.3"
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "fallow": "3.49.0",
+    "knip": "6.48.0",
+    "lefthook": "^2.2.4",
+    "typescript": "^7.0.2"
   },
   "packageManager": "pnpm@11.2.2"
 }

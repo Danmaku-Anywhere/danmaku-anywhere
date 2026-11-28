@@ -8,11 +8,11 @@ Consumed by `danmaku-engine`, `danmaku-provider`, `extension-protocol`, the exte
 
 ## Scripts
 
-| Command | Description |
-| ------- | ----------- |
+| Command      | Description       |
+| ------------ | ----------------- |
 | `pnpm build` | Compile with tsgo |
-| `pnpm test` | Vitest |
-| `pnpm dev` | Watch build |
+| `pnpm test`  | Vitest            |
+| `pnpm dev`   | Watch build       |
 
 ## Dependencies
 

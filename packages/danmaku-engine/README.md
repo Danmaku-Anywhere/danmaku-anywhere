@@ -8,11 +8,11 @@ Consumed by the browser extension (`packages/danmaku-anywhere`). Depends on `@da
 
 ## Scripts
 
-| Command | Description |
-| ------- | ----------- |
+| Command      | Description       |
+| ------------ | ----------------- |
 | `pnpm build` | Compile with tsgo |
-| `pnpm test` | Vitest |
-| `pnpm dev` | Watch build |
+| `pnpm test`  | Vitest            |
+| `pnpm dev`   | Watch build       |
 
 ## Dependencies
 

@@ -34,7 +34,7 @@ const LOGGED_OUT_NAV = {
 test.describe('unreachable source', () => {
   test.use({
     expectedConsoleErrors: [
-      /\[RpcManager\] Error in RPC handler.*Failed to fetch/,
+      /\[RpcManager\] Error in RPC handler.*network request failed for /,
     ],
   })
 
@@ -63,6 +63,7 @@ test.describe('unreachable source', () => {
       )
     ).toBeVisible()
     await expect(page.getByText('Failed to fetch')).toHaveCount(0)
+    await expect(page.getByText(/network request failed/)).toHaveCount(0)
     await expect(popup.search.retryButton).toBeVisible()
   })
 })

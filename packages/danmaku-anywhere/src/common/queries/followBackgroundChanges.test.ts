@@ -106,19 +106,22 @@ describe('followBackgroundChanges', () => {
   it.each([
     ['sync', 'providerConfig'],
     ['local', 'manifests'],
-  ] as const)('refreshes source capabilities on a %s write to %s', async (area, key) => {
-    const capabilities = sourceQueryKeys.configCapabilities('bilibili')
-    const urlSource = sourceQueryKeys.urlSource('https://a.example/1')
-    client.setQueryData(capabilities, {})
-    client.setQueryData(urlSource, {})
+  ] as const)(
+    'refreshes source capabilities on a %s write to %s',
+    async (area, key) => {
+      const capabilities = sourceQueryKeys.configCapabilities('bilibili')
+      const urlSource = sourceQueryKeys.urlSource('https://a.example/1')
+      client.setQueryData(capabilities, {})
+      client.setQueryData(urlSource, {})
 
-    await fakeBrowser.storage[area].set({ [key]: {} })
+      await fakeBrowser.storage[area].set({ [key]: {} })
 
-    await vi.waitFor(() => {
-      expect(isInvalidated(capabilities)).toBe(true)
-    })
-    expect(isInvalidated(urlSource)).toBe(true)
-  })
+      await vi.waitFor(() => {
+        expect(isInvalidated(capabilities)).toBe(true)
+      })
+      expect(isInvalidated(urlSource)).toBe(true)
+    }
+  )
 
   it('keeps source capabilities on an unrelated storage write', async () => {
     const capabilities = sourceQueryKeys.configCapabilities('bilibili')
