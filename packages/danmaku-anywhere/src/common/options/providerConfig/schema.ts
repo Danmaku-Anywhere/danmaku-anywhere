@@ -5,12 +5,16 @@ import type { Options } from '@/common/options/OptionsService/types'
 // manifest's `configSchema`. The host doesn't need to know what fields are
 // valid, that's the manifest's job. The provider tag is derived from
 // `manifestId` on read (providerTypeFromManifestId), not persisted.
+//
+// `allowLocalOrigins` lets this config's pipelines reach private and loopback
+// hosts, such as a self-hosted LAN server. Absent means off.
 export const providerConfigSchema = z.object({
   id: z.string(),
   manifestId: z.string(),
   name: z.string().min(1),
   enabled: z.boolean(),
   configValues: z.record(z.string(), z.unknown()),
+  allowLocalOrigins: z.boolean().optional(),
 })
 
 export type ProviderConfig = z.infer<typeof providerConfigSchema>

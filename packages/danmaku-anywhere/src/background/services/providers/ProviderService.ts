@@ -36,7 +36,7 @@ import type {
 import { withUrlScheme } from '@/common/utils/link'
 import { invariant, isServiceWorker } from '@/common/utils/utils'
 import type { OmitSeasonId } from './IDanmakuProvider'
-import { MANIFEST_RUN_OPTIONS } from './ManifestProviderService'
+import { manifestRunOptions } from './ManifestProviderService'
 import {
   CATALOG_EMPTY_MESSAGE,
   CATALOG_UNREACHABLE_MESSAGE,
@@ -259,9 +259,11 @@ export class ProviderService {
     )
   }
 
+  // The probe runs on the manifest's own defaults rather than any config's
+  // inputs, so a config's local-origins opt-in does not cover it.
   async probeLogin<T = unknown>(manifestId: string): Promise<T | null> {
     const runner = await this.manifestRegistry.getRunner(manifestId)
-    return runner.runLoginProbe<T>(undefined, MANIFEST_RUN_OPTIONS)
+    return runner.runLoginProbe<T>(undefined, manifestRunOptions())
   }
 
   // Resolves whether a manifest-driven source needs a login/cookie action so

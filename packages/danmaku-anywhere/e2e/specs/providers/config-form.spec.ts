@@ -5,22 +5,10 @@ import { expect, test } from '../../setup/fixtures'
 import { applyProfile } from '../../setup/profile'
 
 /**
- * The generic provider config editor renders fields from the manifest's
- * configSchema (text, select, nested objects) instead of hand-written per
- * provider forms. Drives the editor for a custom DanDanPlay-compatible server
- * and the built-in Bilibili provider, asserting the schema-driven fields show,
- * a save toast appears, and the edited values land in stored configValues.
- * Also asserts the schema's `required` constraint blocks saving an empty
- * auth header until it is filled, and that configSchema constraints
- * (format: uri, minimum) surface as field errors and block saving until
- * the values are fixed. Field titles localize with the UI language,
- * so they are matched against both the English source and the zh override.
- * A labelled enum (oneOf const/title) lists its titles, not the raw values.
- * The built-in DanDanPlay hides its server and credential fields behind a
- * note, which a built-in without a server field does not show, and its
- * editor fits the popup without a sideways scrollbar.
- * Finally, a provider whose manifest spec fails to load shows an error with a
- * retry action instead of a stripped name-only form that would drop its config.
+ * The provider config editor renders configSchema fields in English and zh,
+ * enforces their constraints, and saves configValues. Built-in DanDanPlay hides
+ * its server fields; only custom sources get the local-network toggle, off by
+ * default. A manifest that fails to load shows an error with retry.
  */
 
 const customDdp: ProviderConfig = {
@@ -169,6 +157,7 @@ test('hides the server and credential fields of the built-in DanDanPlay', async 
     await expect(popup.providers.field(hidden)).toHaveCount(0)
   }
   await expect(page.getByText(/^(Headers|请求头)$/)).toHaveCount(0)
+  await expect(popup.providers.localOriginsToggle()).toHaveCount(0)
 })
 
 test('the built-in DanDanPlay editor does not scroll sideways', async ({
@@ -193,6 +182,37 @@ test('the built-in DanDanPlay editor does not scroll sideways', async ({
     }).length
   })
   expect(sidewaysScrollers).toBe(0)
+})
+
+test('a custom source opts into local network servers per config', async ({
+  context,
+  page,
+  extensionId,
+  da,
+}) => {
+  await applyProfile(context, da, {
+    customProviders: [
+      {
+        ...customDdp,
+        configValues: {
+          ...customDdp.configValues,
+          baseUrl: 'http://192.168.1.10:8080',
+        },
+      },
+    ],
+  })
+
+  const popup = await Popup.open(page, extensionId, '/providers')
+  await popup.providers.edit('My DDP Server')
+
+  await expect(popup.providers.localOriginsToggle()).not.toBeChecked()
+  await popup.providers.localOriginsToggle().check()
+  await popup.providers.save()
+
+  await popup.toast.expectSuccess(/Source updated|弹幕源已更新/)
+
+  const saved = await da.providerConfig.get('custom-ddp-form')
+  expect(saved?.allowLocalOrigins).toBe(true)
 })
 
 const labelledManifest = {
