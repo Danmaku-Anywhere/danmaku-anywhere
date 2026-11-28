@@ -36,6 +36,6 @@
   // cannot trace through the Inversify container.
   "usedClassMembers": ["setup"],
   "duplicates": {
-    "ignore": ["packages/bangumi-api/src/*.d.ts", "**/test/mockData.ts"]
+    "ignore": ["**/test/mockData.ts"]
   }
 }
