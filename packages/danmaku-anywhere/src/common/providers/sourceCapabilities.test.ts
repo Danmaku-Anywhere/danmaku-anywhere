@@ -38,19 +38,18 @@ describe('capabilitiesFromManifest', () => {
 })
 
 describe('canMatchBySearch', () => {
-  it.each([
-    'search',
-    'episodes',
-    'danmaku',
-  ] as const)('needs a %s pipeline', (missing) => {
-    const capabilities = capabilitiesFromManifest({
-      search: pipeline,
-      episodes: pipeline,
-      danmaku: pipeline,
-      [missing]: undefined,
-    })
-    expect(canMatchBySearch(capabilities)).toBe(false)
-  })
+  it.each(['search', 'episodes', 'danmaku'] as const)(
+    'needs a %s pipeline',
+    (missing) => {
+      const capabilities = capabilitiesFromManifest({
+        search: pipeline,
+        episodes: pipeline,
+        danmaku: pipeline,
+        [missing]: undefined,
+      })
+      expect(canMatchBySearch(capabilities)).toBe(false)
+    }
+  )
 })
 
 describe('canResolveMapping', () => {

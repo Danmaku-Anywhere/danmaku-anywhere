@@ -24,24 +24,24 @@ describe('reparentPopover', () => {
     expect(popover.showPopover).toHaveBeenCalled()
   })
 
-  it.each([
-    'open',
-    'closed',
-  ] as const)('moves the popover into the %s shadow root of a fullscreen host', (mode) => {
-    const popover = makePopover()
-    const host = document.createElement('div')
-    const root = host.attachShadow({ mode })
-    vi.spyOn(chrome.dom, 'openOrClosedShadowRoot').mockImplementation(
-      (element) => {
-        return element === host ? root : null
-      }
-    )
-    document.body.append(host)
+  it.each(['open', 'closed'] as const)(
+    'moves the popover into the %s shadow root of a fullscreen host',
+    (mode) => {
+      const popover = makePopover()
+      const host = document.createElement('div')
+      const root = host.attachShadow({ mode })
+      vi.spyOn(chrome.dom, 'openOrClosedShadowRoot').mockImplementation(
+        (element) => {
+          return element === host ? root : null
+        }
+      )
+      document.body.append(host)
 
-    reparentPopover(popover, document, host)
+      reparentPopover(popover, document, host)
 
-    expect(popover.parentNode).toBe(root)
-  })
+      expect(popover.parentNode).toBe(root)
+    }
+  )
 
   it('leaves the popover in place for a fullscreen video', () => {
     const popover = makePopover()

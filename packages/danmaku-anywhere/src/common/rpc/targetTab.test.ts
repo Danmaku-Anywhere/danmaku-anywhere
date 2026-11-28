@@ -44,15 +44,12 @@ describe('readTargetTabId', () => {
     expect(readTargetTabId('?detached=1&tabId=42')).toBe(42)
   })
 
-  it.each([
-    '',
-    '?detached=1',
-    '?tabId=',
-    '?tabId=abc',
-    '?tabId=-1',
-  ])('ignores %j', (search) => {
-    expect(readTargetTabId(search)).toBeUndefined()
-  })
+  it.each(['', '?detached=1', '?tabId=', '?tabId=abc', '?tabId=-1'])(
+    'ignores %j',
+    (search) => {
+      expect(readTargetTabId(search)).toBeUndefined()
+    }
+  )
 })
 
 describe('buildDetachedPopupUrl', () => {

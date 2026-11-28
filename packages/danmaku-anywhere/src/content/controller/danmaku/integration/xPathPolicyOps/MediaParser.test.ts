@@ -276,26 +276,18 @@ describe('MediaParser', () => {
   })
 
   describe('Separators before the episode', () => {
-    it.each([
-      '·',
-      '•',
-      '・',
-      '-',
-      '–',
-      '|',
-      '｜',
-      '.',
-      ':',
-      '：',
-    ])('should drop a trailing "%s" left by truncating at the episode', (separator) => {
-      const input = createInput(`Show S2 ${separator} E3`)
+    it.each(['·', '•', '・', '-', '–', '|', '｜', '.', ':', '：'])(
+      'should drop a trailing "%s" left by truncating at the episode',
+      (separator) => {
+        const input = createInput(`Show S2 ${separator} E3`)
 
-      expect(parser.parse(input)).toMatchObject({
-        searchTitle: 'Show',
-        season: 'S2',
-        episode: 3,
-      })
-    })
+        expect(parser.parse(input)).toMatchObject({
+          searchTitle: 'Show',
+          season: 'S2',
+          episode: 3,
+        })
+      }
+    )
 
     it('should drop a trailing separator before a Chinese episode marker', () => {
       const input = createInput('进击的巨人 - 第3集')

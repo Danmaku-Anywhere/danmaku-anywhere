@@ -10,12 +10,12 @@ Danmaku data providers and API client configuration. Supplies danmaku from multi
 
 ## Scripts
 
-| Command | Description |
-| ------- | ----------- |
-| `pnpm build` | Compile protobuf + tsgo |
-| `pnpm protobuf:compile` | Regenerate Bilibili protobuf |
-| `pnpm openapi-ts` | (OpenAPI) — generate types/schemas using openapi-ts |
-| `pnpm test` | Vitest |
+| Command                 | Description                                         |
+| ----------------------- | --------------------------------------------------- |
+| `pnpm build`            | Compile protobuf + tsgo                             |
+| `pnpm protobuf:compile` | Regenerate Bilibili protobuf                        |
+| `pnpm openapi-ts`       | (OpenAPI) — generate types/schemas using openapi-ts |
+| `pnpm test`             | Vitest                                              |
 
 ## Dependencies
 

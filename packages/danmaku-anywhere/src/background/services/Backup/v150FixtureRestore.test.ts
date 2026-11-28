@@ -81,17 +81,18 @@ describe('restoring the v1.5.0 backup fixture', () => {
     )
   })
 
-  it.each(
-    FIXTURE_STORES
-  )('leaves %s with the same contents as the startup upgrade', async (name) => {
-    const { container } = await restoreFile()
-    const restored = await readStores(container)
+  it.each(FIXTURE_STORES)(
+    'leaves %s with the same contents as the startup upgrade',
+    async (name) => {
+      const { container } = await restoreFile()
+      const restored = await readStores(container)
 
-    fakeBrowser.reset()
-    const upgraded = await upgradeAtStartup()
+      fakeBrowser.reset()
+      const upgraded = await upgradeAtStartup()
 
-    expect(restored[name]).toEqual(upgraded[name])
-  })
+      expect(restored[name]).toEqual(upgraded[name])
+    }
+  )
 
   it('stores each restored store at its latest version', async () => {
     const { container } = await restoreFile()

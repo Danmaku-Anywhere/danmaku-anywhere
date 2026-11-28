@@ -8,11 +8,11 @@ Used by the extension. The message types it shares with the web app live in `ext
 
 ## Scripts
 
-| Command | Description |
-| ------- | ----------- |
-| `pnpm build` | Compile with tsgo |
-| `pnpm lint` | Biome |
-| `pnpm type-check` | TypeScript |
+| Command           | Description       |
+| ----------------- | ----------------- |
+| `pnpm build`      | Compile with tsgo |
+| `pnpm lint`       | Biome             |
+| `pnpm type-check` | TypeScript        |
 
 ## Dependencies
 

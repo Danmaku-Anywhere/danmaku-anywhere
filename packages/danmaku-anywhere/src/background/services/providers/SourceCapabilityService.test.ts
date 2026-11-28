@@ -258,18 +258,21 @@ describe('SourceCapabilityService gates', () => {
     ['episodes', ['search'], 'episodesUnsupported'],
     ['danmaku', ['search', 'episodes'], 'danmakuUnsupported'],
     ['seasonRefresh', FULL, 'seasonRefreshUnsupported'],
-  ] as const)('refuses %s for a manifest without that pipeline', async (operation, pipelines, problem) => {
-    const config = makeConfig('partial')
-    const service = build([config], [makeRunner('partial', [...pipelines])])
+  ] as const)(
+    'refuses %s for a manifest without that pipeline',
+    async (operation, pipelines, problem) => {
+      const config = makeConfig('partial')
+      const service = build([config], [makeRunner('partial', [...pipelines])])
 
-    await expect(
-      service.sourceProvider(config, operation)
-    ).rejects.toMatchObject({
-      name: 'SourceError',
-      problem,
-      sourceName: config.name,
-    })
-  })
+      await expect(
+        service.sourceProvider(config, operation)
+      ).rejects.toMatchObject({
+        name: 'SourceError',
+        problem,
+        sourceName: config.name,
+      })
+    }
+  )
 
   it('refuses source operations on legacy MacCMS', async () => {
     const config = makeConfig(LEGACY_MACCMS_ID)

@@ -1,6 +1,7 @@
 # Privacy Policy
 
 ## What we collect
+
 We collect non-personally identifiable information to analyze and improve the extension. The data collection is handled differently for the extension's popup interface and the content script that runs on web pages.
 
 ### 1. General Extension Usage

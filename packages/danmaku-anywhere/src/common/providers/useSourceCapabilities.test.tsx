@@ -205,16 +205,14 @@ describe('useUrlParseAnswer', () => {
     })
   })
 
-  it.each([
-    '  ',
-    'sousou no frieren',
-    'frieren',
-    'Re:Zero',
-  ])('leaves %j as not a link without asking', async (text) => {
-    render(<UrlProbe text={text} />)
+  it.each(['  ', 'sousou no frieren', 'frieren', 'Re:Zero'])(
+    'leaves %j as not a link without asking',
+    async (text) => {
+      render(<UrlProbe text={text} />)
 
-    await new Promise((resolve) => setTimeout(resolve, 300))
-    expect(element.textContent).toBe('notLink')
-    expect(rpc.mediaFindUrlSource).not.toHaveBeenCalled()
-  })
+      await new Promise((resolve) => setTimeout(resolve, 300))
+      expect(element.textContent).toBe('notLink')
+      expect(rpc.mediaFindUrlSource).not.toHaveBeenCalled()
+    }
+  )
 })

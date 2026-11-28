@@ -15,7 +15,7 @@ The deciding question for any spec: **if you removed every UI assertion, would t
 ## Red before green
 
 A spec that has never failed has not been tested. Before a spec counts as verification, watch it
-fail against the build *without* the change and pass *with* it. A spec that passes both ways
+fail against the build _without_ the change and pass _with_ it. A spec that passes both ways
 asserts something other than what changed.
 
 Write the spec first where you can; that makes the "without" build the current tree and costs
@@ -114,9 +114,11 @@ The standard shape:
 ## Comment rules
 
 ### Header JSDoc
+
 3–6 lines, placed immediately after imports, before the first `test()` / `describe()`. Name what's exercised and what's asserted. No design-doc essays. No restating the test body step by step.
 
 ### Inside the test body / POMs / setup files
+
 Default: **no comments.** Add one only when removing it would lead the next reader to file a wrong PR. The bar is "this would cost an hour of debugging if you didn't know." Examples that earn their keep:
 
 - `fixtures.ts` eager watcher attach — explains a Playwright timing footgun (workers register before fixtures resolve).
@@ -129,6 +131,7 @@ Examples that do NOT earn their keep — delete on sight:
 - "We do X because Y is broken" without naming what Y is or when it can be removed.
 
 ### Don't restate WHAT
+
 Well-named identifiers are the WHAT. Comment only the WHY, and only when WHY is non-obvious.
 
 ## Hacks to avoid
@@ -139,15 +142,16 @@ Well-named identifiers are the WHAT. Comment only the WHY, and only when WHY is 
 
 ## Seeding determinism (boot races)
 
-The fixture seeds the manifest store from the default catalog at boot (before the test body runs), and `applyProfile` clears storage. So a spec that seeds a *stale* manifest via `rawStorage` races the boot seed: under load, boot can overwrite your stale seed with the real version, and the spec flakes (the "update available" never appears). Don't seed staleness into storage.
+The fixture seeds the manifest store from the default catalog at boot (before the test body runs), and `applyProfile` clears storage. So a spec that seeds a _stale_ manifest via `rawStorage` races the boot seed: under load, boot can overwrite your stale seed with the real version, and the spec flakes (the "update available" never appears). Don't seed staleness into storage.
 
-The deterministic pattern for an update-flow spec: seed the store at the manifest's *real* version (`manifestStoreSeed`), and make the catalog advertise a newer one (`mockCatalog(ids, { id: '9.9.9' })`). The boot seed and your seed agree on the real version, so the race is benign; the "available update" comes from the catalog, whose request happens at popup time against the bumped mock. See `e2e/specs/sources/updates.spec.ts`.
+The deterministic pattern for an update-flow spec: seed the store at the manifest's _real_ version (`manifestStoreSeed`), and make the catalog advertise a newer one (`mockCatalog(ids, { id: '9.9.9' })`). The boot seed and your seed agree on the real version, so the race is benign; the "available update" comes from the catalog, whose request happens at popup time against the bumped mock. See `e2e/specs/sources/updates.spec.ts`.
 
 ## Baselines
 
 These are enforced by `e2e/setup/fixtures.ts` and apply to every spec by default.
 
 ### Network strict-mode
+
 Any HTTP request that isn't mocked by a per-spec route or covered by the project allow-list **fails the test**. Project allow-list covers `chrome-extension:`, `data:`, `blob:`, `about:`, and `*.invalid` hostnames.
 
 To opt extra origins in:
@@ -159,12 +163,15 @@ test.use({ allowedNetworkOrigins: ['accounts.google.com'] }) // OAuth redirect �
 One-line justification per entry. Prefer a per-spec mock over widening the allow-list.
 
 ### Console-error default-fail
+
 Any `console.error` during the test body fails it. Patterns match by `includes` (string) or `.test` (RegExp) against the formatted line — the entry includes a `[sw]` / `[page <url>]` prefix and a trailing `(<url>:<line>:<col>)`, so patterns can target any of those parts.
 
 To opt out:
 
 ```ts
-test.use({ expectedConsoleErrors: [/SchemaValidationError: known stale fixture/] })
+test.use({
+  expectedConsoleErrors: [/SchemaValidationError: known stale fixture/],
+})
 ```
 
 One-line justification per entry. Treat opt-outs as tech debt — leaving them unjustified means a real regression hides behind a "we always saw that one."
@@ -178,6 +185,7 @@ POMs live under `e2e/pom/`. The composed root is `Popup` (`e2e/pom/Popup.ts`); p
 Add methods to a POM rather than reaching into selectors from a spec. If a spec needs a one-off selector that isn't worth a POM method, add a one-line comment explaining why a method wasn't added.
 
 ### Locale-stable matchers
+
 Toast text and dialog title/body are i18n-translated. Prefer `popup.toast.expectSuccess` / `expectError` (which scope by `data-severity`) over raw text matching. When asserting message text, use a regex that matches both locales: see `SeasonDetailsPage.expectCommentCountToBe` (matches `条弹幕` and `comments`).
 
 Anchor such a regex and point it at the element that holds the text, not at an ancestor. Playwright matches a regex against an element's whole text content, and adjacent nodes concatenate with no separator: an episode row numbered 1 whose caption reads `0条弹幕` matches as `10条弹幕`, so a count assertion on the row passes on zero comments. That is why the count caption carries its own `comment-count` testid.

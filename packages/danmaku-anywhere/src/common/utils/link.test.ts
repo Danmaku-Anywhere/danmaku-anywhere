@@ -46,12 +46,10 @@ describe('isExplicitLink', () => {
     expect(isExplicitLink(text)).toBe(true)
   })
 
-  it.each([
-    'v.qq.com/x/cover/abc.html',
-    'Re.Zero/2',
-    'Fate/Zero',
-    'frieren',
-  ])('leaves %s to the sources', (text) => {
-    expect(isExplicitLink(text)).toBe(false)
-  })
+  it.each(['v.qq.com/x/cover/abc.html', 'Re.Zero/2', 'Fate/Zero', 'frieren'])(
+    'leaves %s to the sources',
+    (text) => {
+      expect(isExplicitLink(text)).toBe(false)
+    }
+  )
 })

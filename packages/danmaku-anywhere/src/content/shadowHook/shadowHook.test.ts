@@ -7,22 +7,22 @@ afterEach(() => {
 })
 
 describe('attachShadow hook', () => {
-  it.each([
-    'open',
-    'closed',
-  ] as const)('announces a %s root from its host to the host tree', (mode) => {
-    const listener = vi.fn((event: Event) => event.target)
-    document.addEventListener(SHADOW_ROOT_ATTACHED_EVENT, listener, true)
-    const host = document.createElement('div')
-    document.body.append(host)
+  it.each(['open', 'closed'] as const)(
+    'announces a %s root from its host to the host tree',
+    (mode) => {
+      const listener = vi.fn((event: Event) => event.target)
+      document.addEventListener(SHADOW_ROOT_ATTACHED_EVENT, listener, true)
+      const host = document.createElement('div')
+      document.body.append(host)
 
-    const root = host.attachShadow({ mode })
+      const root = host.attachShadow({ mode })
 
-    expect(root.mode).toBe(mode)
-    expect(listener).toHaveBeenCalledTimes(1)
-    expect(listener.mock.results[0].value).toBe(host)
-    document.removeEventListener(SHADOW_ROOT_ATTACHED_EVENT, listener, true)
-  })
+      expect(root.mode).toBe(mode)
+      expect(listener).toHaveBeenCalledTimes(1)
+      expect(listener.mock.results[0].value).toBe(host)
+      document.removeEventListener(SHADOW_ROOT_ATTACHED_EVENT, listener, true)
+    }
+  )
 
   it('does not leave the shadow root the host sits in', () => {
     const outer = document.createElement('div')
