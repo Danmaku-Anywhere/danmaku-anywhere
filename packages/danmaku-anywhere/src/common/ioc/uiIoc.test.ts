@@ -1,5 +1,5 @@
 import { fakeBrowser } from '@webext-core/fake-browser'
-import { Container } from 'inversify'
+import { Container, type Newable } from 'inversify'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createBackgroundContainer } from '@/background/ioc'
 import { LoggerSymbol } from '@/common/Logger'
@@ -52,7 +52,7 @@ describe('createUiContainer', () => {
     const { createUiContainer } = await import('./uiIoc')
     const testContainer = createUiContainer()
 
-    const services = [
+    const services: Newable<object>[] = [
       ExtensionOptionsService,
       FrameRegistry,
       PlayerScript,

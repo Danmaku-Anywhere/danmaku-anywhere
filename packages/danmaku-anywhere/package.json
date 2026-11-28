@@ -83,7 +83,7 @@
     "dexie": "^4.4.7",
     "i18next": "^27.2.9",
     "immer": "^11.2.13",
-    "inversify": "^7.11.0",
+    "inversify": "^8.3.0",
     "jszip": "^3.10.2",
     "onnxruntime-web": "^1.31.1",
     "opencc-js": "^1.4.2",

@@ -1,3 +1,4 @@
+import type { Newable } from 'inversify'
 import { describe, expect, it } from 'vitest'
 import { AlarmManager } from '@/background/alarm/AlarmManager'
 import { ContextMenuManager } from '@/background/contextMenu/ContextMenuManager'
@@ -36,7 +37,7 @@ describe('createBackgroundContainer', () => {
   it('constructs every service resolved by the background entrypoint', () => {
     const testContainer = createBackgroundContainer()
 
-    const services = [
+    const services: Newable<object>[] = [
       OptionsManager,
       ScriptingManager,
       MountConfigTabReloader,

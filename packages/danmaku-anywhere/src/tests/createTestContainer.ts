@@ -17,7 +17,7 @@ export function createTestContainer(
   container.load(...modules)
 
   for (const { identifier, value } of overrides) {
-    container.rebindSync(identifier).toConstantValue(value)
+    container.rebind(identifier).toConstantValue(value)
   }
 
   return container
