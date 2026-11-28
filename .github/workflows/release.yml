@@ -7,8 +7,8 @@ on:
   workflow_dispatch:
     inputs:
       target_tag:
-        description: 'Tag to release'
-        required: false
+        description: 'Tag to release (vX.Y.Z, on master, not yet published)'
+        required: true
         type: string
 
 jobs:
