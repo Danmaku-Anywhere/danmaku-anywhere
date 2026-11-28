@@ -47,7 +47,8 @@ Evaluate each new thread via the `reviewing-ai-feedback` skill. It defines the a
 ### 2c. Resolve mechanics
 
 ```bash
-gh api graphql -f query='{ repository(owner: "<OWNER>", name: "<REPO>") { pullRequest(number: N) { reviewThreads(first: 50) { nodes { id isResolved } } } } }'
+gh api graphql -f query='{ repository(owner: "<OWNER>", name: "<REPO>") { pullRequest(number: N) { reviewThreads(first: 50) { nodes { id isResolved comments(first: 5) { nodes { author { login } body } } } } } } }'
+gh api graphql -f query='mutation { addPullRequestReviewThreadReply(input: {pullRequestReviewThreadId: "THREAD_ID", body: "..."}) { comment { id } } }'
 gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "THREAD_ID"}) { thread { isResolved } } }'
 ```
 
@@ -84,13 +85,3 @@ Then send one message: PR URL, what was addressed, what was skipped (with one-li
 - **Don't resolve a thread without replying** unless it's a pure duplicate. The PR author reads the thread later and needs to know your reasoning.
 - **Don't commit Co-Authored-By or AI attribution.**
 - **Don't merge.** Ever. Merging is a human action.
-
-## 5. Quick reference
-
-| Action | Command |
-|---|---|
-| One-shot status | `scripts/pr-status.sh <N>` |
-| List threads + IDs | `gh api graphql -f query='{ repository(owner: "<OWNER>", name: "<REPO>") { pullRequest(number: N) { reviewThreads(first: 50) { nodes { id isResolved comments(first: 5) { nodes { author { login } body } } } } } } }'` |
-| Reply on thread | `gh api graphql -f query='mutation { addPullRequestReviewThreadReply(input: {pullRequestReviewThreadId: "ID", body: "..."}) { comment { id } } }'` |
-| Resolve thread | `gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "ID"}) { thread { isResolved } } }'` |
-| Stop loop | `CronDelete <jobId>` |

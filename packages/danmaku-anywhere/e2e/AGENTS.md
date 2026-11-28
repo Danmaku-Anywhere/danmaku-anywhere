@@ -14,81 +14,45 @@ The deciding question for any spec: **if you removed every UI assertion, would t
 
 ## Red before green
 
-A spec that has never failed has not been tested. Before a spec counts as verification, watch it
-fail against the build _without_ the change and pass _with_ it. A spec that passes both ways
-asserts something other than what changed.
+A spec that has never failed has not been tested. Before a spec counts as verification, watch it fail against the build *without* the change and pass *with* it. A spec that passes both ways asserts something other than what changed.
 
-Write the spec first where you can; that makes the "without" build the current tree and costs
-nothing. When the change is already written, build the merge base into a throwaway worktree and
-run the spec against that (~35s of building, measured).
+Write the spec first where you can, so the "without" build is the current tree. When the change is already written, build the merge base in a throwaway worktree (commands in the `verifying-changes` skill).
 
-Refactors are the exception: behavior deliberately did not change, so the spec goes green
-immediately. Do not weaken an assertion to manufacture a red.
+Refactors are the exception: behavior deliberately did not change, so the spec goes green immediately. Do not weaken an assertion to manufacture a red.
 
-Scratch specs live in `e2e/specs/.scratch/`, which is gitignored and skipped by the spec lint.
-A scratch spec becomes real coverage by moving the file into `e2e/specs/<area>/`.
+Scratch specs live in `e2e/specs/.scratch/`, which is gitignored and skipped by the spec lint. Moving the file into `e2e/specs/<area>/` makes it real coverage.
 
 ## The spec lint
 
-`pnpm run lint:specs` (part of `pnpm lint`) fails any spec that asserts only on state with no
-user-visible signal. It hard-fails locally and only warns under `CI`, so it bites the loop that
-wrote the spec without gating an outside contributor's PR.
+`pnpm run lint:specs` (part of `pnpm lint`) fails any spec that asserts only on state with no user-visible signal. It hard-fails locally and only warns under `CI`.
 
-Behavior with genuinely no UI surface opts out by naming the reason in a comment:
+Behavior with genuinely no UI surface opts out by naming the reason in a comment, held to the same standard as an `expectedConsoleErrors` entry:
 
 ```
 lint-specs-allow-state-only: OPFS scope has no DOM signal, so it asserts storage state.
 ```
 
-Treat an opt-out the same as an `expectedConsoleErrors` entry: one line, and it has to say why.
-
 ## Build before you run
 
-The suite loads `build/`, not your source. Playwright's global setup refuses to run against a
-stale or wrong-env build and prints the command, because otherwise a direct
-`playwright test <spec>` silently tests the previous build and reads as a real result.
+The suite loads `build/`, not your source. Global setup refuses to run against a stale or wrong-env build and prints the command; otherwise `playwright test <spec>` would silently test the previous build.
 
 ```bash
-VITE_DA_ENV=e2e pnpm run build   # ~11s, whatever changed
+VITE_DA_ENV=e2e pnpm run build
 ```
 
-It does not build for you: CI has its own build step, and a build started from inside the runner
-would surface its failures as test startup noise. `DA_E2E_ALLOW_STALE_BUILD=1` skips the check.
+It does not build for you, because a build started inside the runner would surface its failures as test startup noise. `DA_E2E_ALLOW_STALE_BUILD=1` skips the check.
 
 ## Which tests to run
 
-**Never run the full suite locally. That is CI's job.** Run the affected specs, and at most the
-smoke band on top.
+**Never run the full suite locally. That is CI's job.** Run the affected specs, and at most the smoke band on top.
 
-- `pnpm test:e2e:changed` — inner loop. **It only follows direct imports.** Measured on this suite:
-  editing `setup/fixtures.ts` selects 50 files and `pom/Popup.ts` selects 40, but editing
-  `pom/SearchPage.ts` or `pom/MountPage.ts`, which specs reach through `Popup`, selects **1**. A
-  source file the specs never import, such as a content script, selects **0**. It under-selects
-  quietly, which reads exactly like passing. After touching a leaf POM or product code, name the
-  covering specs by path instead of trusting it.
-- `pnpm test:e2e:smoke` — ~7s band tagged `@smoke`: install, mount, search. The most you should run
-  before pushing.
-- `pnpm test:e2e` — the full sweep. **CI only.** It is slow, it contends for the machine, and the
-  occlusion specs flake under that load, so a local red here tells you little.
-- `pnpm test:e2e:ui` — Playwright UI mode, for a human: watch mode, per-step DOM time travel,
-  pick-locator, console and network panes. It opens a window, so it needs a display and is not
-  something an agent can drive.
-- `pnpm test:e2e:verify <spec>` — the evidence run. Forces a full trace and writes the HTML report,
-  so `pnpm exec playwright show-report` gives a reviewer the run step by step. Use it on the spec a
-  PR adds, not on the suite.
+- `pnpm test:e2e:changed` is the inner loop, but it only follows direct imports. A leaf POM reached through `Popup` selects one spec, and a content script no spec imports selects none, which reads exactly like passing. After touching a leaf POM or product code, name the covering specs by path.
+- `pnpm test:e2e:smoke` runs the `@smoke` band (install, mount, search). The most to run before pushing.
+- `pnpm test:e2e` is the full sweep, CI only. The `occlusion-cross-origin` specs are load-sensitive and flake locally under parallel workers.
+- `pnpm test:e2e:ui` is Playwright UI mode for a human; it needs a display.
+- `pnpm test:e2e:verify <spec>` is the evidence run: full trace and HTML report (`pnpm exec playwright show-report`). Use it on the spec a PR adds.
 
-**Specs run headless, always.** Extensions load fine in Chromium's current headless mode,
-including the CDP Extensions domain the migration swap depends on, so nothing in the suite needs a
-display and no spec should opt itself into a window.
-
-`DA_HEADED=1` exists only for a human who needs to watch a run with their own eyes. Do not set it
-in a spec, a script, or CI. If a spec ever genuinely cannot work headless, that is a finding worth
-writing down next to the spec, not a flag to sprinkle.
-
-Headless is not a stability fix. The `occlusion-cross-origin` specs are load-sensitive under
-parallel workers and flake locally in either mode; they pass run on their own and they pass in CI.
-Local wall-clock swings more with machine load than with headless versus headed, so do not read a
-speed difference into it.
+Specs run headless, always. Extensions and the CDP Extensions domain work in current headless Chromium. `DA_HEADED=1` is for a human watching a run; never set it in a spec, a script or CI.
 
 ## Every e2e spec asserts at least one user-visible signal
 
@@ -111,28 +75,10 @@ The standard shape:
 4. Assert state: ground truth in DB / chrome.storage (optional but encouraged)
 ```
 
-## Comment rules
 
-### Header JSDoc
+## Comments
 
-3–6 lines, placed immediately after imports, before the first `test()` / `describe()`. Name what's exercised and what's asserted. No design-doc essays. No restating the test body step by step.
-
-### Inside the test body / POMs / setup files
-
-Default: **no comments.** Add one only when removing it would lead the next reader to file a wrong PR. The bar is "this would cost an hour of debugging if you didn't know." Examples that earn their keep:
-
-- `fixtures.ts` eager watcher attach — explains a Playwright timing footgun (workers register before fixtures resolve).
-- Anything that documents a known race, a library bug, a CDP delivery quirk, or an envelope constraint (MUI portal behavior, structuredClone limits, etc.).
-
-Examples that do NOT earn their keep — delete on sight:
-
-- Narration of what the next line does: `// Click the menu item` above `menu.click()`.
-- Explanations of Playwright auto-wait, locator chaining, or `dispatchEvent` mechanics. Readers know.
-- "We do X because Y is broken" without naming what Y is or when it can be removed.
-
-### Don't restate WHAT
-
-Well-named identifiers are the WHAT. Comment only the WHY, and only when WHY is non-obvious.
+Header JSDoc and the default-to-no-comments rule are in the root `CLAUDE.md`. In test bodies, POMs and setup files a comment earns its place only for a known race, a library bug, a CDP delivery quirk or an envelope constraint (the eager watcher attach in `fixtures.ts` is an example), and it names what is broken.
 
 ## Hacks to avoid
 
@@ -192,58 +138,40 @@ Anchor such a regex and point it at the element that holds the text, not at an a
 
 ## Migration specs
 
-Live under `e2e/specs/migration/`. They are slower than baseline specs (~10 to 30s each first-run, dominated by downloading the prior release on a cold `.e2e-cache/`) and only run when changes might affect persisted shape: chrome.storage option schemas, Dexie IndexedDB schema versions, provider config reshapes, etc.
+Live under `e2e/specs/migration/`. They are slower than baseline specs (first run downloads the prior release) and only run when a change might affect persisted shape: chrome.storage option schemas, Dexie schema versions, provider config reshapes.
 
 ### The swap mechanism
 
-Launch a persistent Chromium context with the prior released build via `--load-extension`. Let it boot and write defaults. Then call CDP `Extensions.loadUnpacked` with the current build's path inside the SAME context. Both manifests embed `MIGRATION_EXTENSION_KEY`, so Chrome resolves them to the same extension ID. The bumped current manifest version (+99 on the build component) triggers Chrome's real update install path, which actually re-evaluates the SW against the new files and runs the upgrade pipeline.
+Launch a persistent Chromium context with the prior released build via `--load-extension`. Let it boot and write defaults. Then call CDP `Extensions.loadUnpacked` with the current build's path inside the SAME context. Both manifests embed `MIGRATION_EXTENSION_KEY`, so Chrome resolves them to the same extension ID. The bumped current manifest version (+99 on the build component) triggers Chrome's real update install path, which re-evaluates the SW against the new files and runs the upgrade pipeline.
 
-`--load-extension` close + relaunch with a different path is NOT a valid swap: Chrome keeps the prior compiled SW bytecode and silently no-ops every migration. CDP `Extensions.loadUnpacked` is the only path that actually re-evaluates the SW. The launch helper passes `--enable-unsafe-extension-debugging` to unlock the CDP Extensions domain.
+`--load-extension` close + relaunch with a different path is NOT a valid swap: Chrome keeps the prior compiled SW bytecode and silently no-ops every migration. The launch helper passes `--enable-unsafe-extension-debugging` to unlock the CDP Extensions domain.
 
 ### user_data_dir must be a short path
 
-Chrome's IDB / LevelDB silently breaks on Windows paths over `MAX_PATH` (260 chars). `testInfo.outputPath('userDataDir')` is too deep once Chrome adds its own per-origin subdir. Use `os.tmpdir()` for the user_data_dir or migrations will appear to never run because IDB never opens. This is a real Chrome quirk, not a test-only issue.
+Chrome's IDB / LevelDB silently breaks on Windows paths over `MAX_PATH` (260 chars). `testInfo.outputPath('userDataDir')` is too deep once Chrome adds its own per-origin subdir. Use `os.tmpdir()` or migrations will appear to never run because IDB never opens.
 
 ### Sourcing the prior release
 
-`ensurePriorRelease(tag)` resolves the prior build in this order:
-
-1. `DA_PRIOR_EXTENSIONS_DIR` env var pointing at a folder of pre-downloaded unpacked extensions (subdirs named after the version, e.g. `1.5.0/`). Skips the network. Useful for local iteration.
-2. The on-disk cache at `.e2e-cache/prior-releases/<tag>/`.
-3. Public HTTPS download from `github.com/{repo}/releases/download/{tag}/{asset}`. No auth required (the release asset is public). CI does not need a token.
-
-The baseline tag, repo, and asset filename template live in `e2e/migration.config.json` so bumping the baseline doesn't require code changes. Bumping the baseline (e.g. after a new prod release) is a JSON edit and a fresh cache key derivation.
+`ensurePriorRelease(tag)` uses `DA_PRIOR_EXTENSIONS_DIR` (a folder of unpacked extensions named by version, e.g. `1.5.0/`) when set, then the `.e2e-cache/prior-releases/<tag>/` cache, then a public download of the release asset. The baseline tag, repo and asset template live in `e2e/migration.config.json`; bumping the baseline is a JSON edit.
 
 ### Seed data
 
-The smoke seeds state by driving v1.5.0's own popup UI from `e2e/poms/legacy/v1.5.0/MigrationLegacyPopup`:
+The smoke seeds state by driving v1.5.0's own popup UI through `e2e/poms/legacy/v1.5.0/MigrationLegacyPopup`. Two traps:
 
-- `restoreBackup(jsonPath)` — uploads to `/options/backup`, writes `chrome.storage`.
-- `importDanmaku(zipPath)` — uploads to `/mount`, writes IDB rows. v1.5.0's import auto-extracts zip files, so one zip can hold multiple danmaku files.
-- `addTitleMapping(snapshot)` — sends v1.5.0's `seasonMapAdd` RPC, so its own service worker writes the seasonMap row. v1.5.0 only creates one from the content script's floating panel.
-- `exportBackup()` and `toggleProvider(name)` — used by the fixture generator.
+- `addTitleMapping(snapshot)` sends v1.5.0's `seasonMapAdd` RPC because v1.5.0 only creates a seasonMap row from the content script's floating panel.
+- `backup.json.gz` (under `e2e/fixtures/migration/`) must be an export from v1.5.0 itself. An export from a later build is restored verbatim by v1.5.0, and the migration steps in between then never run.
 
-Fixtures are committed as binaries under `e2e/fixtures/migration/`:
-
-- `backup.json.gz` — a backup exported by v1.5.0 itself, so every store is at the version v1.5.0 writes (extensionOptions 22, danmakuOptions 7) and carries only fields v1.5.0 knows. Never replace it with an export from a later build: v1.5.0's restore writes a newer version verbatim, and the steps in between then never run.
-- `danmaku.zip` — one representative danmaku export per provider type.
-
-Regenerate `backup.json.gz` with `pnpm exec playwright test --config e2e/fixture-gen/playwright.config.ts`. The generator takes v1.5.0's fresh-install export, layers the user edits in `v150Backup.gen.ts` on top, restores that through v1.5.0's backup page, disables a built-in through its providers page, and saves v1.5.0's second export. The edits are synthetic, so nothing needs redacting; the migration specs assert on their values, so change both together.
-
-Regenerate `danmaku.zip` with `scripts/prepareMigrationFixtures.mjs <export-root>`. The script picks the smallest file per provider and renames entries so filenames do not leak watch history.
+Regenerate `backup.json.gz` with `pnpm exec playwright test --config e2e/fixture-gen/playwright.config.ts`; the migration specs assert on the values in `v150Backup.gen.ts`, so change both together. Regenerate `danmaku.zip` with `scripts/prepareMigrationFixtures.mjs <export-root>`.
 
 ### Asserting post-swap
 
-Read state through a popup page (`chrome-extension://<id>/pages/popup.html`), not the service worker. The popup forces the new SW to wake and exercises RPC handlers, surfacing latent errors in the upgrade path. The swapped SW reference from Playwright may go stale.
+Read state through a popup page (`chrome-extension://<id>/pages/popup.html`), not the service worker. The popup wakes the new SW and exercises RPC handlers, surfacing latent errors in the upgrade path; the swapped SW reference from Playwright may go stale.
 
-Smoke assertions combine an error gate, a schema gate, AND positive data integrity assertions. The schema gate (`schemaViolations` in `e2e/setup/migrationState.ts`) parses every upgraded options store against its current zod schema, which catches a migration that tolerates bad data but leaves a required field missing. The error gate catches throwing migrations (`OptionsService` logs them, Dexie's `db.open()` rejects). Positive assertions catch silent corruption (a migration that returns `[]` or drops a field without throwing) since no error fires. Neither alone is sufficient. Assertions match seeded state by ID rather than byte-equality so a v22 to v25 migration that legitimately reshapes fields still passes; the test fails only when an entry goes missing or the upgrade explicitly errors.
+Combine three gates, since none alone is sufficient: an error gate (throwing migrations), a schema gate (`schemaViolations` in `e2e/setup/migrationState.ts` parses every upgraded options store against its current zod schema), and positive data assertions (a migration that returns `[]` or drops a field fires no error). Match seeded state by ID, not byte-equality, so a legitimate reshape still passes.
 
 ### Helpers
 
-- `ensurePriorRelease(tag)`: stages a prior release into `.e2e-cache/prior-releases/<tag>/extension/`, injecting the test key. Honors `DA_PRIOR_EXTENSIONS_DIR` for local sourcing.
-- `ensureCurrentBuildForMigration()`: copies the current `build/` into `.e2e-cache/prior-releases/current-<workerSlot>/extension/`, injects the test key, bumps the manifest version.
-- `launchExtension({ userDataDir, extensionPath })`: launches a persistent context with the prior build via `--load-extension` and the CDP Extensions flag.
-- `swapExtension(launched, { extensionPath })`: swaps to the current build via CDP `Extensions.loadUnpacked` in the same context.
-- `upgradeToCurrentBuild(context, currentExt)` (`e2e/setup/priorInstall.ts`): swaps and returns once the upgrade has finished, which it reads from the current build's popup getting past its upgrade screen. A spec that reads storage right after a bare `swapExtension` can catch a half-upgraded store.
+Use `upgradeToCurrentBuild(context, currentExt)` (`e2e/setup/priorInstall.ts`), not a bare `swapExtension`: it returns once the current popup gets past its upgrade screen, and a spec that reads storage right after a bare swap can catch a half-upgraded store.
 
-Vendored POMs for the prior release's UI live under `e2e/poms/legacy/<version>/` and are frozen. Never share with current POMs since current UI evolves.
+Vendored POMs for the prior release's UI live under `e2e/poms/legacy/<version>/` and are frozen. Never share them with current POMs.
+
