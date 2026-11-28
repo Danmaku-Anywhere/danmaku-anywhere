@@ -23,13 +23,13 @@ jobs:
       branch_slug: ${{ steps.check.outputs.branch_slug }}
       feature_name: ${{ steps.check.outputs.feature_name }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # Need full history for tag comparison
 
       - name: Check conditions
         id: check
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           script: |
             const script = require('./scripts/preview-build-check.cjs');
@@ -42,11 +42,15 @@ jobs:
     with:
       ref: ${{ needs.check-changes.outputs.ref }}
       version_suffix: ${{ github.run_number }}
-    secrets: inherit
+    secrets:
+      CRX_SECRET_KEY: ${{ secrets.CRX_SECRET_KEY }}
 
   publish-preview:
     needs: [ check-changes, call-build ]
     runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ needs.check-changes.outputs.is_long_lived == 'true' && format('preview-branch-{0}', needs.check-changes.outputs.branch_slug) || needs.check-changes.outputs.is_pr == 'true' && format('preview-pr-{0}', needs.check-changes.outputs.pr_number) || format('nightly-{0}', github.run_id) }}
+      cancel-in-progress: false
     permissions:
       contents: write
     steps:
@@ -93,7 +97,7 @@ jobs:
         shell: bash
 
       - name: Publish Release
-        uses: ncipollo/release-action@v1
+        uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd # v1.21.0
         with:
           allowUpdates: ${{ steps.tag.outputs.allow_updates }}
           artifacts: "packages/*"
@@ -112,9 +116,9 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Update latest-preview tag
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           script: |
             const script = require('./scripts/update-nightly-tag.cjs');
@@ -129,9 +133,9 @@ jobs:
       pull-requests: write
       issues: write
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Comment release link on PR and linked issues
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           script: |
             const script = require('./scripts/preview-build-comment.cjs');
