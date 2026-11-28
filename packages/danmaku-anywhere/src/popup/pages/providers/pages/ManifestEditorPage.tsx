@@ -30,6 +30,7 @@ import {
   useManifestSource,
   useSaveUserManifest,
 } from '../hooks/useManifestEditor'
+import { incompatibilityMessage } from '../incompatibility'
 import { STARTER_MANIFEST, stringifyManifest } from '../manifestEditor'
 
 type EditorMode = 'create' | 'edit' | 'view'
@@ -303,7 +304,9 @@ function ManifestEditor({
                 {issues.map((issue, index) => (
                   <li key={`${issue.path}:${issue.message}:${index}`}>
                     {issue.path ? `${issue.path}: ` : ''}
-                    {issue.message}
+                    {issue.incompatibility
+                      ? incompatibilityMessage(t, issue.incompatibility)
+                      : issue.message}
                   </li>
                 ))}
               </Stack>

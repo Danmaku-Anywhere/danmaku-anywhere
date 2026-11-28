@@ -32,6 +32,7 @@ import {
   matchesQuery,
 } from '../catalog'
 import { CatalogSection } from '../components/CatalogSection'
+import { IncompatibleManifestsCallout } from '../components/IncompatibleManifestsCallout'
 import { InstalledList } from '../components/InstalledList'
 import { NeedsAttentionCallout } from '../components/NeedsAttentionCallout'
 import { ProviderAddMenu } from '../components/ProviderAddMenu'
@@ -256,6 +257,9 @@ export const ProvidersPage = (): ReactElement => {
               <UpdatesSection
                 installedManifestIds={installedManifestIds}
                 manifestById={manifestById}
+              />
+              <IncompatibleManifestsCallout
+                manifests={manifestData?.incompatible ?? []}
               />
               <NeedsAttentionCallout configs={configs} filter={filter} />
               <SectionHeader

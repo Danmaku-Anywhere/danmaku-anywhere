@@ -1,4 +1,4 @@
-import { SUPPORTED_API_VERSIONS, zManifest } from '@mr-quin/dango'
+import { loadManifest } from '@mr-quin/dango'
 
 export interface BundledCatalogEntry {
   id: string
@@ -27,14 +27,11 @@ function manifestFile(id: string): string {
 const bundledById = new Map<string, BundledEntry>()
 
 for (const raw of Object.values(rawModules)) {
-  const parsed = zManifest.safeParse(raw)
-  if (!parsed.success) {
+  const loaded = loadManifest(raw)
+  if (loaded.status !== 'ok') {
     continue
   }
-  const manifest = parsed.data
-  if (!SUPPORTED_API_VERSIONS.has(manifest.apiVersion)) {
-    continue
-  }
+  const manifest = loaded.manifest
   bundledById.set(manifest.id, {
     id: manifest.id,
     apiVersion: manifest.apiVersion,

@@ -1,9 +1,10 @@
 import {
+  checkManifestCompatibility,
   getDisplayStrings,
+  loadManifest,
   type Manifest,
+  type ManifestIncompatibility,
   ManifestRunner,
-  SUPPORTED_API_VERSIONS,
-  zManifest,
 } from '@mr-quin/dango'
 import { inject, injectable } from 'inversify'
 import { z } from 'zod'
@@ -13,6 +14,7 @@ import {
   publishDataChange,
 } from '@/common/messaging/dataChangeChannel'
 import type {
+  IncompatibleManifestInfo,
   ManifestUpdate,
   ProviderManifestInfo,
 } from '@/common/rpcClient/background/types'
@@ -32,6 +34,7 @@ const zCatalogEntry = z.object({
   apiVersion: z.number(),
   version: z.string(),
   file: z.string(),
+  minEngineVersion: z.string().optional(),
 })
 
 const zCatalogIndex = z.object({
@@ -58,6 +61,30 @@ const INDEX_TIMEOUT_MS = 5000
 // the edge cache is still cold.
 const FILE_TIMEOUT_MS = 15000
 
+export class ManifestIncompatibleError extends Error {
+  constructor(readonly incompatibility: ManifestIncompatibility) {
+    super(describeIncompatibility(incompatibility))
+    this.name = 'ManifestIncompatibleError'
+  }
+}
+
+function describeIncompatibility(
+  incompatibility: ManifestIncompatibility
+): string {
+  if (incompatibility.reason === 'engine-version') {
+    return `This manifest needs engine ${incompatibility.minEngineVersion} or newer. Update the extension to use it.`
+  }
+  return `This manifest uses apiVersion ${incompatibility.apiVersion}, which this version of the extension does not support.`
+}
+
+function storedString(manifest: unknown, key: string): string | undefined {
+  if (manifest !== null && typeof manifest === 'object' && key in manifest) {
+    const value = (manifest as Record<string, unknown>)[key]
+    return typeof value === 'string' ? value : undefined
+  }
+  return undefined
+}
+
 function storedVersion(manifest: unknown): unknown {
   if (
     manifest !== null &&
@@ -77,6 +104,7 @@ interface RegisteredManifest {
 @injectable('Singleton')
 export class ManifestRegistry {
   private readonly runners = new Map<string, RegisteredManifest>()
+  private readonly incompatible = new Map<string, IncompatibleManifestInfo>()
   private readonly log: ILogger
   private readonly store: IManifestStore
   private readonly baseUrl = import.meta.env.VITE_PROXY_URL
@@ -123,6 +151,11 @@ export class ManifestRegistry {
     })
   }
 
+  async listIncompatible(): Promise<IncompatibleManifestInfo[]> {
+    await this.whenLoaded()
+    return [...this.incompatible.values()]
+  }
+
   getLastCheckedAt(): Promise<number | null> {
     return this.store.getLastCheckedAt()
   }
@@ -137,6 +170,7 @@ export class ManifestRegistry {
     await this.whenLoaded()
     await this.store.remove(manifestId)
     this.runners.delete(manifestId)
+    this.incompatible.delete(manifestId)
     this.recordChange([manifestId], false)
   }
 
@@ -239,12 +273,14 @@ export class ManifestRegistry {
     expectedId?: string
   ): Promise<void> {
     await this.whenLoaded()
-    const parsed = zManifest.safeParse(manifest)
-    if (!parsed.success) {
-      throw new Error(
-        `invalid manifest: ${JSON.stringify(parsed.error.issues)}`
-      )
+    const loaded = loadManifest(manifest)
+    if (loaded.status === 'incompatible') {
+      throw new ManifestIncompatibleError(loaded.incompatibility)
     }
+    if (loaded.status === 'malformed') {
+      throw new Error(`invalid manifest: ${JSON.stringify(loaded.issues)}`)
+    }
+    const parsed = { data: loaded.manifest }
     const id = parsed.data.id
     // The id is the manifest's identity; an update must target the id being
     // edited, or it would orphan the old entry and could overwrite an
@@ -260,7 +296,7 @@ export class ManifestRegistry {
     if (mode === 'update' && existing?.kind !== 'user') {
       throw new Error(`No user manifest with id "${id}" to update`)
     }
-    // Build before persisting: a manifest that passes zManifest can still throw
+    // Build before persisting: a manifest that loads can still throw
     // at runner construction, and a stored-but-unbuildable manifest would break
     // init() on the next startup.
     const runner = this.buildRunner(parsed.data)
@@ -287,6 +323,7 @@ export class ManifestRegistry {
   // before any catalog sync.
   private async load(): Promise<void> {
     this.runners.clear()
+    this.incompatible.clear()
     const record = await this.store.getAll()
     for (const [id, entry] of Object.entries(record)) {
       this.loadEntry(id, entry)
@@ -360,7 +397,7 @@ export class ManifestRegistry {
     return fetched.map(({ parsed }) => parsed.id)
   }
 
-  // Each bundled manifest is re-validated with zManifest so a corrupt bundle
+  // Each bundled manifest is re-validated with loadManifest so a corrupt bundle
   // entry is skipped rather than crashing startup. Tagged 'bundled' rather than 'preinstalled' so
   // update() replaces it outright on the next reachable sync instead of
   // treating it as an installed source pinned until a manual apply.
@@ -373,17 +410,13 @@ export class ManifestRegistry {
     const toRegister: Manifest[] = []
     for (const entry of missing) {
       const raw = bundledManifestRaw(entry.id)
-      const parsed = zManifest.safeParse(raw)
-      if (!parsed.success) {
-        this.log.error(
-          'Skipping invalid bundled manifest:',
-          entry.id,
-          parsed.error.issues
-        )
+      const loaded = loadManifest(raw)
+      if (loaded.status !== 'ok') {
+        this.log.error('Skipping unusable bundled manifest:', entry.id, loaded)
         continue
       }
-      updates[parsed.data.id] = { manifest: raw, kind: 'bundled' }
-      toRegister.push(parsed.data)
+      updates[loaded.manifest.id] = { manifest: raw, kind: 'bundled' }
+      toRegister.push(loaded.manifest)
     }
     if (toRegister.length === 0) {
       return
@@ -421,13 +454,16 @@ export class ManifestRegistry {
       await this.fetchJson(`${this.baseUrl}/manifest`, INDEX_TIMEOUT_MS)
     )
     return index.manifests.filter((entry) => {
-      if (SUPPORTED_API_VERSIONS.has(entry.apiVersion)) {
+      const compatibility = checkManifestCompatibility(entry)
+      if (compatibility.compatible) {
         return true
       }
       this.log.warn(
-        'Dropping catalog manifest with unsupported apiVersion:',
+        'Dropping catalog manifest this engine cannot run:',
         entry.id,
-        entry.apiVersion
+        compatibility.reason === 'api-version'
+          ? compatibility.apiVersion
+          : compatibility.minEngineVersion
       )
       return false
     })
@@ -449,26 +485,22 @@ export class ManifestRegistry {
       this.log.error('Failed to fetch catalog manifest:', id, file, e)
       return null
     }
-    const parsed = zManifest.safeParse(raw)
-    if (!parsed.success) {
-      this.log.error(
-        'Skipping invalid catalog manifest:',
-        id,
-        parsed.error.issues
-      )
+    const loaded = loadManifest(raw)
+    if (loaded.status !== 'ok') {
+      this.log.error('Skipping unusable catalog manifest:', id, loaded)
       return null
     }
     // The store keys by the manifest's own id; a mismatch with the catalog id
     // would store it under the wrong key and loop as a never-resolving update.
-    if (parsed.data.id !== id) {
+    if (loaded.manifest.id !== id) {
       this.log.error(
         'Skipping catalog manifest with mismatched id:',
         id,
-        parsed.data.id
+        loaded.manifest.id
       )
       return null
     }
-    return { raw, parsed: parsed.data }
+    return { raw, parsed: loaded.manifest }
   }
 
   private async fetchJson(url: string, timeoutMs: number): Promise<unknown> {
@@ -484,14 +516,24 @@ export class ManifestRegistry {
   private loadEntry(id: string, entry: ManifestEntry): void {
     // Per-manifest, and runner construction can throw past safeParse, so one
     // bad stored spec can't take the whole registry down on startup.
-    const parsed = zManifest.safeParse(entry.manifest)
-    if (!parsed.success) {
-      this.log.error('Failed to load manifest:', id, parsed.error.issues)
+    const loaded = loadManifest(entry.manifest)
+    if (loaded.status === 'incompatible') {
+      this.log.warn('Installed manifest needs a newer engine:', id, loaded)
+      this.incompatible.set(id, {
+        id,
+        name: storedString(entry.manifest, 'name') ?? id,
+        version: storedString(entry.manifest, 'version'),
+        incompatibility: loaded.incompatibility,
+      })
+      return
+    }
+    if (loaded.status === 'malformed') {
+      this.log.error('Failed to load manifest:', id, loaded.issues)
       return
     }
     try {
       this.runners.set(id, {
-        runner: this.buildRunner(parsed.data),
+        runner: this.buildRunner(loaded.manifest),
         kind: entry.kind,
       })
     } catch (e) {

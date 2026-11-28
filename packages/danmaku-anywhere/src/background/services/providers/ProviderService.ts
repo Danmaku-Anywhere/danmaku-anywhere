@@ -315,6 +315,7 @@ export class ProviderService {
   async listManifests(locale?: string): Promise<ProviderManifestList> {
     return {
       manifests: await this.manifestRegistry.listManifests(locale),
+      incompatible: await this.manifestRegistry.listIncompatible(),
       lastCheckedAt: await this.manifestRegistry.getLastCheckedAt(),
     }
   }

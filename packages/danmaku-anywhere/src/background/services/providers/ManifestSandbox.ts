@@ -1,4 +1,9 @@
-import { ManifestRunner, type RunOptions, zManifest } from '@mr-quin/dango'
+import {
+  loadManifest,
+  ManifestRunner,
+  type RunOptions,
+  zManifest,
+} from '@mr-quin/dango'
 import { injectable } from 'inversify'
 import type {
   ManifestTestDanmakuInput,
@@ -9,6 +14,7 @@ import type {
   ManifestValidationResult,
 } from '@/common/rpcClient/background/types'
 import { extensionFetchLike } from './extensionFetchLike'
+import { ManifestIncompatibleError } from './ManifestRegistry'
 import { resolveManifestInputs } from './manifestInputs'
 
 // An ad-hoc test run executes an unsaved, user-authored manifest: arbitrary
@@ -29,17 +35,27 @@ export const TEST_DANMAKU_RUN_OPTIONS: RunOptions = Object.freeze({
 @injectable('Singleton')
 export class ManifestSandbox {
   validate(manifest: unknown): ManifestValidationResult {
-    const parsed = zManifest.safeParse(manifest)
-    if (parsed.success) {
+    const loaded = loadManifest(manifest)
+    if (loaded.status === 'ok') {
       return { valid: true }
     }
-    return {
-      valid: false,
-      issues: parsed.error.issues.map((issue) => ({
-        path: issue.path.join('.'),
-        message: issue.message,
-      })),
+    if (loaded.status === 'incompatible') {
+      const { incompatibility } = loaded
+      return {
+        valid: false,
+        issues: [
+          {
+            path:
+              incompatibility.reason === 'api-version'
+                ? 'apiVersion'
+                : 'minEngineVersion',
+            message: new ManifestIncompatibleError(incompatibility).message,
+            incompatibility,
+          },
+        ],
+      }
     }
+    return { valid: false, issues: loaded.issues }
   }
 
   async search(

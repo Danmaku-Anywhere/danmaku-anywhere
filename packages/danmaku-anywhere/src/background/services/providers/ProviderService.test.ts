@@ -825,6 +825,7 @@ describe('ProviderService.refreshCatalog', () => {
       applyUpdates,
       recordChecked,
       listManifests,
+      listIncompatible: async () => [],
       getLastCheckedAt,
       batchChanges: async <T>(run: () => Promise<T>): Promise<T> => {
         batchDepth += 1
@@ -952,6 +953,7 @@ describe('ProviderService.refreshCatalog', () => {
       applyUpdates: vi.fn(async () => {}),
       recordChecked,
       listManifests,
+      listIncompatible: async () => [],
       getLastCheckedAt,
       batchChanges: runBatch,
     }
@@ -988,6 +990,7 @@ describe('ProviderService.refreshCatalog', () => {
       applyUpdates: vi.fn(async () => {}),
       recordChecked: vi.fn(async () => {}),
       listManifests,
+      listIncompatible: async () => [],
       getLastCheckedAt,
       batchChanges: runBatch,
     }
@@ -1078,6 +1081,7 @@ describe('ProviderService.seedDefaultProviders', () => {
       getPendingUpdates,
       recordChecked,
       listManifests,
+      listIncompatible: async () => [],
       batchChanges: runBatch,
     }
 

@@ -764,6 +764,11 @@
     "filter": {
       "placeholder": "筛选弹幕源"
     },
+    "incompatible": {
+      "apiVersion": "使用了 API 版本 {{version}}，当前版本的扩展不支持。",
+      "engineVersion": "需要 {{version}} 或更高版本的引擎。请更新扩展后使用。",
+      "title": "部分弹幕源无法在当前版本运行"
+    },
     "installed": {
       "addDefaultInstance": "添加默认实例",
       "addInstance": "添加实例",
