@@ -58,7 +58,7 @@
   "scripts": {
     "test": "vitest run",
     "protobuf:compile": "pbjs -t static-module -w es6 -o src/protobuf/protobuf.js src/protobuf/definition/bilibili.dm.proto && pbts -o src/protobuf/protobuf.d.ts src/protobuf/protobuf.js",
-    "build": "pnpm protobuf:compile && tsgo && copyfiles src/protobuf/protobuf.js src/protobuf/protobuf.d.ts dist",
+    "build": "pnpm protobuf:compile && tsgo && node -e \"for (const f of ['protobuf.js', 'protobuf.d.ts']) { require('node:fs').cpSync('src/protobuf/' + f, 'dist/src/protobuf/' + f) }\"",
     "lint": "tsgo && biome check --fix",
     "lint:ci": "biome ci",
     "type-check": "tsgo --noEmit",
@@ -72,7 +72,6 @@
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "^0.99.0",
-    "copyfiles": "^2.4.1",
     "protobufjs-cli": "^2.7.1",
     "vitest": "^5.1.2"
   }
