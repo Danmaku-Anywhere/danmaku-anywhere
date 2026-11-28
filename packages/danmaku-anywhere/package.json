@@ -115,7 +115,7 @@
     "@webext-core/fake-browser": "^2.0.2",
     "fake-indexeddb": "^6.2.8",
     "i18next-cli": "^1.95.3",
-    "jsdom": "^30.1.3",
+    "jsdom": "^31.0.1",
     "vite": "^8.4.0",
     "vitest": "^5.1.2",
     "web-ext": "^10.8.0",
