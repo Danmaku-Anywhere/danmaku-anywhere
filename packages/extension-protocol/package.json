@@ -31,9 +31,9 @@
     }
   },
   "scripts": {
-    "build": "tsgo",
+    "build": "tsc",
     "lint": "biome check --fix",
-    "type-check": "tsgo --noEmit",
+    "type-check": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {

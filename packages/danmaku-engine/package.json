@@ -11,11 +11,11 @@
   "types": "src/index.d.ts",
   "scripts": {
     "test": "vitest run",
-    "build": "tsgo",
-    "lint": "tsgo&& biome check --fix",
+    "build": "tsc",
+    "lint": "tsc && biome check --fix",
     "lint:ci": "biome ci",
-    "type-check": "tsgo --noEmit",
-    "dev": "tsgo -w"
+    "type-check": "tsc --noEmit",
+    "dev": "tsc -w"
   },
   "dependencies": {
     "@danmaku-anywhere/danmaku-model": "workspace:*",
