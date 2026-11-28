@@ -1,54 +1,22 @@
 # Agent context: packages/danmaku-anywhere
 
-## Purpose
-
-Chrome/Firefox browser extension that injects danmaku (bullet comments) onto video pages. This is the main user-facing product.
-
-## Tech stack
-
-- React 19, TypeScript, Vite (via @crxjs/vite-plugin)
-- MUI (Material UI) for components
-- Zustand for client state, TanStack Query for server state
-- React Hook Form + Zod for form validation
-- Inversify for dependency injection
-- Dexie (IndexedDB) for local storage
-- i18next for internationalization
-
 ## Architecture
 
-The extension runs across three isolated contexts that communicate via RPC (`src/common/rpc/`):
-
-- **Background service worker** — persistent logic, API calls, database access
-- **Content scripts** — injected into web pages, manages danmaku overlay on video elements
-- **Popup** — extension popup UI for settings and manual controls
-
-Inversify IoC container (`src/common/ioc/`) wires up dependencies across these contexts.
+The extension runs in three isolated contexts (background service worker, content scripts, popup) that talk over RPC (`src/common/rpc/`), wired by the Inversify container in `src/common/ioc/`. Content scripts run in an isolated world, so talking to the page needs messaging.
 
 The player frame mounts the danmaku overlay in a shadow root (`#danmaku-anywhere-player`, open in e2e builds / closed in prod). `DanmakuLayoutService` builds `wrapper` → `container` (danmaku comments) + `uiLayer` (in-player UI: skip button, info panel; `position: absolute`, `pointer-events: none`, z 10000), positioned over the `<video>`. Theme tokens (`--da-*`) are injected onto the shadow `:host` via `buildSakuraCssVars(mode)`.
 
 Season identity is `(providerConfigId, indexedId)`, enforced by a unique Dexie index. A season belongs to the provider config instance that fetched it; the row's `manifestId` only names the source type for chips and filters. Built-in configs have `id === manifestId` (`isBuiltinConfig`), so deleting and re-adding one reattaches its seasons. A re-created custom instance gets a new uuid, so the old seasons stay orphans: viewable, not refetchable, bookmarks dropped with the config. There is no relink action yet. Never derive season identity from config values such as `baseUrl`; editing a config must not detach its seasons, which is also why the form hides a built-in's server fields.
 
-## Conventions
+## Testing
 
-- Functional components with hooks only
-- Zustand for global client state, `useState` for local state
-- TanStack Query for all server/async state
-- React Hook Form + Zod for form validation
-- Error boundaries for error handling
-- Inversify IoC container for dependency injection
-
-## Testing conventions
-
-- **Every e2e spec gets a header JSDoc block** (3-6 lines) describing what the test exercises and what it asserts. Place it immediately after imports, before the first `test()`. Treat it as the spec a future reader sees first. For unit and integration tests the header is optional; add it when the `describe`/`it` names do not say enough. **No narration inside the test body** — default to no comments; add one only when removing it would mislead the next reader (footguns, races, library quirks). Well-named identifiers do the WHAT.
-- e2e specs live under `e2e/specs/<area>/<source>.spec.ts`. Use the `Popup` POM in `e2e/pom/` and the `applyProfile` helper in `e2e/setup/` instead of touching selectors or chrome.storage directly. Per-source mock builders live in `e2e/network/<source>.ts`.
+- e2e rules, header comments and which specs to run are in `e2e/AGENTS.md`; read it before adding or changing a spec. Specs use the `Popup` POM and `applyProfile` rather than raw selectors or chrome.storage; mock builders live in `e2e/network/<source>.ts`.
 - **Doubles for Inversify services**: to stand in for a service with private fields, use `createTestContainer([module], [{ identifier, value: partial }]).get(ClassUnderTest)` from `src/tests/createTestContainer.ts`. Overrides are typed `unknown`, so a partial object needs no `as unknown as` cast, which `lint:specs` rejects.
-- e2e has its own doctrine — read `e2e/AGENTS.md` before adding or modifying specs. It covers test taxonomy (unit vs package-integration vs e2e), the "user-visible signal required" rule, network strict-mode and console-error opt-outs, and what hacks to avoid.
-- **Run only affected e2e locally.** The full suite is for CI, never for a local loop. Run the spec(s) that exercise the surface you changed — e.g. `pnpm exec playwright test e2e/specs/sources/dandanplay.spec.ts` for the popup search → details flow, or `e2e/specs/mount/` for danmaku-tree changes — and at most `pnpm test:e2e:smoke` on top. `pnpm test:e2e:changed` follows direct imports only and selects nothing for a content-script edit, so do not read a clean run from it as coverage.
+- Playwright empties `test-results/` on every run. Copy screenshots and recordings out before the next run.
 
 ## Gotchas
 
-- `@crxjs/vite-plugin` has its own HMR behavior — don't confuse with standard Vite
-- Content scripts run in an isolated world — communication with the page requires messaging
+- `@crxjs/vite-plugin` has its own HMR behavior. Do not treat it as standard Vite.
 - **`offsetParent` works for in-player elements despite the shadow root.** They mount under the positioned `uiLayer` in the same tree, so `offsetParent`/`parentElement` resolve to it. AI reviewers reliably claim `offsetParent` is `null` "in shadow DOM" — it isn't here, and the info-panel e2e covers the positioning that would break if it were.
 - **In-player CSS uses `--da-*` tokens, never hardcoded colors.** The shadow `:host` is themed and supports light mode, so `rgba(255, 255, 255, ...)` vanishes on a light surface. Use `var(--da-text)` or `color-mix(in srgb, var(--da-text) N%, transparent)` (see `SkipButton.css`, `PlayerInfoPanel.css`).
 - **Player activity/idle is shared via `PlayerIdleService`.** Consumers (info panel, density chart) subscribe; don't add your own `document` listeners. Activity is gated by pointer geometry over the video's rect: the overlays are `pointer-events: none` so you can't listen on them, and the `<video>` itself misses pointer events over the in-player controls. Don't reduce it to a bare `document` listener or a `target.contains(video)` DOM test — both count the whole page.
@@ -61,4 +29,3 @@ Season identity is `(providerConfigId, indexedId)`, enforced by a unique Dexie i
 - **`pnpm <script>` can run in a sibling worktree.** From inside a worktree, `cd packages/danmaku-anywhere && pnpm <script>` sometimes resolves into a different danmaku-anywhere worktree (the banner prints another branch). Pin it: absolute-path `cd` to this worktree's package dir and invoke the binary directly (`pnpm exec <bin>` or `./node_modules/.bin/<bin>`), and confirm with `git rev-parse --abbrev-ref HEAD`.
 - Queries follow changes made in other contexts through `src/common/queries/followBackgroundChanges.ts`, which covers chrome.storage writes and the data-change channel. A background service whose state the UI reads announces its changes on that channel (see `ManifestRegistry`); don't add storage or message listeners in hooks or pages.
 - **Option store readiness**: every option store has a descriptor in `src/common/options/optionStores.ts` (key, storage area, latest version). The latest version comes from the store's `LATEST_*_VERSION` constant in its `version.ts`, which its last `.version(…)` step also uses; bump that constant when adding a step, and a test checks the descriptors against the services. Option hooks read through `useOptionStoreQuery`, which suspends until `ReadinessService` reports every store at its latest version, and `OptionsService.get/set/update` wait the same way. `OptionsReadinessGate` only decides what a root shows while the upgrade runs or after it fails.
-- See `package.json` for available scripts and dependencies

@@ -1,158 +1,53 @@
-# CLAUDE.md — Agent Guide for Danmaku Anywhere
+# CLAUDE.md
 
-This file provides context for Claude and Cursor working on this codebase.
+Agent guide for Danmaku Anywhere, a browser extension that overlays danmaku (bullet comments) on video sites. Each package has its own `AGENTS.md` with conventions and gotchas: read it before working there, and keep it current.
 
-## What is this project?
+Related repos: the web app (Angular, `Danmaku-Anywhere/web`) installs `danmaku-model` and `extension-protocol` from npm; the backend (Cloudflare Workers, Hono, `Danmaku-Anywhere/backend`) installs `integration-policy` from npm.
 
-Danmaku Anywhere is an open-source project for overlaying danmaku (bullet comments) on video websites. It consists of:
+## Commands
 
-- **Browser extension** (`packages/danmaku-anywhere/`) — Chrome/Firefox extension that injects danmaku onto video pages (Plex, Jellyfin, YouTube, etc.)
-- **Web app**: an Angular SPA for video discovery and playback using Kazumi rules. It lives in `Danmaku-Anywhere/web` and installs `danmaku-model` and `extension-protocol` from npm.
-- **Backend**: Cloudflare Workers API (Hono) for proxying, auth, and LLM features. It lives in `Danmaku-Anywhere/backend` and installs `integration-policy` from npm.
-- **Shared packages** — TypeScript libraries used across the above
-
-## Monorepo structure
-
-```
-packages/
-  danmaku-anywhere/     # Browser extension
-  danmaku-model/        # Shared data model (comments, episodes, seasons) and XML conversion
-  danmaku-engine/       # Render danmaku on video containers
-  danmaku-provider/     # Fetch danmaku from APIs
-  web-scraper/          # Scrape video/page metadata from sites
-  extension-protocol/   # Messages between the extension and the web app
-  integration-policy/   # Schema for site/feature integration policies
-architecture/           # Design notes for the extension
-```
-
-## Quick reference
-
-| Task | Command |
-|---|---|
-| Install deps | `pnpm install` |
-| Build all | `pnpm build` |
-| Build packages only | `pnpm build:packages` |
-| Lint & fix | `pnpm lint` |
-| Type check | `pnpm type-check` |
-| Run all tests | `pnpm test` |
-| Format | `pnpm format` |
-| Dev extension | `cd packages/danmaku-anywhere && pnpm dev` |
-| Extract i18n keys | `cd packages/danmaku-anywhere && pnpm i18n extract` |
-
-Always prefer scripts defined in `package.json` over ad-hoc commands. Run `pnpm type-check` instead of `tsc`/`tsgo`, `pnpm lint` instead of `biome check`, etc. When you need to run a CLI tool not available as a script, use `pnpx` (never `npx`).
-
-## Testing strategy
-
-- **Run affected tests only**: `pnpm --filter '...[origin/master]' test` to test only packages changed since master
-- **Single package**: `pnpm --filter <package> test`
-- **All tests**: `pnpm test` at root
-- Packages use Vitest.
-- Always run `pnpm type-check` and `pnpm lint` — these are fast and catch most issues.
-- **Never run the extension's full e2e suite locally.** `pnpm test:e2e` is CI's job. Locally run the
-  affected spec(s), and at most `pnpm test:e2e:smoke`. `pnpm test:e2e:changed` follows direct
-  imports only, so it under-selects silently: after touching a leaf POM or product code, name the
-  covering specs by path. Specs run headless; `DA_HEADED=1` is for a human watching a run, never
-  for a script or CI. Details in `packages/danmaku-anywhere/e2e/AGENTS.md`.
+- Prefer scripts in `package.json` over ad-hoc commands: `pnpm type-check` not `tsc`, `pnpm lint` not `biome check`. For a CLI that has no script, use `pnpx`, never `npx`.
+- Translation keys: `cd packages/danmaku-anywhere && pnpm i18n extract`.
+- Run `pnpm build:packages` before running the extension in dev mode.
+- Never run the extension's full e2e suite locally; CI does. Which specs to run is in `packages/danmaku-anywhere/e2e/AGENTS.md`.
 
 ## Code style
 
-- **Formatter/linter**: Biome (not ESLint/Prettier). Config at root `biome.json`.
-- **Quotes**: Single quotes, no semicolons (except where required)
-- **Indentation**: 2 spaces
-- **Trailing commas**: ES5 style
-- **Imports**: Use `import type` for type-only imports (enforced by Biome)
-- **No `any`**: Use `unknown` when type is uncertain. `any` triggers a warning.
-- **No same-line if bodies**: always use a block `{ }` on the next line, even for early returns. `if (x) return` → `if (x) { return }`
-- **Prefer `function` declarations**: use `function` declarations over `const` arrow functions for named/exported functions. Arrow functions are fine for callbacks and inline expressions.
-- **No bodyless one-liner arrow functions**: use an explicit block with `return` when the function has a type annotation or is non-trivial. `(x) => x.foo` is fine for simple callbacks; named/typed functions should use `{ return ... }`
-- **No syntax soup**: avoid dense ternary chains, chained optional calls, or expressions that require more than one read to parse. Banned patterns include:
-  - Spread + conditional spread in object literals (e.g. `{ ...base, ...(cond && { foo, bar }) }`) — use a ternary returning the whole object, or assign to a named variable first
-  - Inline boolean-and shortcuts as element children for non-trivial branches — use a ternary or extract a render function
-  - Nested ternaries beyond one level — flatten with early returns, a lookup, or an if/else cascade
-- **Decouple business logic**: keep logic decoupled from UI frameworks for testability — single source of truth over scattered state
-- **No sectional comments**: sectional comments in a class are a code smell — split the class instead
-- **Test header comment**: every e2e spec under `packages/danmaku-anywhere/e2e/` MUST have a 3-6 line JSDoc block immediately after imports describing what the test exercises and what it asserts, before the first `test()`/`describe()` call. For unit and integration tests the same header is OPTIONAL and welcome (not discouraged): add it when it helps, skip it when the `describe`/`it` names already say enough. Do not strip an existing header from a unit/integration test just because it is optional.
+Biome enforces formatting and imports (`pnpm lint`). Beyond that:
+
+- Always put an `if` body in a block on the next line, even for early returns.
+- Use `function` declarations for named and exported functions; arrow functions for callbacks.
+- No syntax soup: no dense ternary chains, nested ternaries, chained optional calls, `{ ...base, ...(cond && { x }) }`, or inline `&&` for non-trivial JSX branches. Use early returns, a lookup, or a named variable.
+- Expected failures return `{ success: true, data } | { success: false, error }`, the shape `danmaku-provider` already uses.
 
 ## Comments
 
-- Default to no comments. Add one only when the **what** or **why** is non-obvious from the code itself — a hidden constraint, a subtle invariant, a workaround, behavior that would surprise a future reader.
-- **Tests get a header.** The standing exception to "default to no comments": a test file may carry a short header block describing what it exercises (see the test-header rule under Code style). It is required for e2e specs and optional but welcome for unit/integration tests. The rest of these rules still apply inside that header and inside tests.
-- **No narration.** Don't restate what the next few lines do. Well-named identifiers carry that load.
-- **No conversation summaries.** Comments are not changelogs, review-response notes, or rationalizations for a decision someone questioned. Those belong in commit messages and PR descriptions.
-- **Don't reference invisible-from-code context.** No `// Added for DA-XXX`, `// Per Gemini review`, `// As discussed`, `// Phase 2 fix`, `// Previously…`. If a future reader can't see it in the tree, the comment is dead weight.
-- **Never put a ClickUp task id (`DA-XXX`) anywhere in source or comments** — not in a file or test header, not in a `for DA-XXX` note, not in a string. Task ids live only in commit messages, PR bodies, and ClickUp. This applies to all code, not just comments.
-- **No defensive comments.** If you're tempted to justify code that looks reasonable on its own, delete the comment. If the code looks unreasonable, fix the code.
-- **Terse, not essays.** Two or three lines is fine when the constraint genuinely needs them; a paragraph-long block comment is almost always wrong. If you find yourself writing one, ask whether the code itself should be restructured to make the constraint obvious instead.
-- **Plain and approachable.** When a comment earns its place, write it so someone new to the file follows it on the first read: full words, a natural sentence, the kind of explanation you'd give a teammate. Skip insider jargon, cryptic abbreviations, and shorthand that only parses if you already know the backstory.
-- **No em dashes (`—`, U+2014) anywhere new** — not in code, not in comments, not in commit messages, not in PR bodies, not in localization strings. Use a period, a comma, a colon, or parentheses instead. This applies to every locale: zh translations should not use `—` either. Existing em dashes in code/docs predate this rule; do not add new ones.
-
-## TypeScript
-
-- Strict mode enabled everywhere (`tsconfig.base.json`)
-- Prefer type inference when the type is obvious
-- Use proper type annotations for function parameters and return types
-- Prefer string union types over TypeScript enums
-- Minimize type assertions (`as`) — only use when truly necessary
-
-## Error handling
-
-- For expected failures, return a `{ success: true, data } | { success: false, error }` result, the shape `danmaku-provider` APIs already return
-- Avoid throwing exceptions for expected error paths
-
-## Model selection
-
-When you launch a subagent or fan out work, match the model to the task instead of reflexively inheriting the current session's model or reaching for the most capable one. Subagents inherit the session model by default, which is usually more (and more expensive) than a narrow task needs, so scaling down is a deliberate choice you have to make.
-
-- Heavy reasoning, research, planning, spec writing, ambiguous problems: the most capable model available.
-- Routine implementation and well-scoped edits: a strong mid-tier model.
-- Cheap, narrow, deterministic work (locate a symbol, read a file, simple greps): the cheapest capable tier.
-
-Don't hardcode a model name as policy; the roster changes. Reason in tiers and pick from what is currently offered (`claude --help` lists the session aliases). Know the override ceiling: explicit subagent overrides are limited to the tiers the Agent/Workflow tools expose (currently `opus`/`sonnet`/`haiku`). A top-flagship alias can only be chosen when launching a session with `claude --model`, so a subagent can be scaled down from the session model but not pushed up past the highest override tier.
-
-## Refactoring guidelines
-
-- Use TDD when refactoring — write tests first, start with reusable primitives
-- Step back and think holistically before refactoring — don't anchor to the current implementation
-
-## Per-package context
-
-Each package/app has its own `AGENTS.md` with package-specific conventions and gotchas. Read the relevant `AGENTS.md` when working on a specific package. See `package.json` in each package for available scripts and dependencies.
-
-Keep `AGENTS.md` files updated when adding conventions or gotchas that are specific to that package.
+- Default to no comments. Write one only for a hidden constraint, a subtle invariant, or a workaround, in plain full sentences.
+- Never put a ClickUp id (`DA-XXX`) in source, tests, strings or comments. Ids live in commit messages and PR bodies.
+- No em dashes (U+2014) in anything new, including code, commits, PR bodies and every locale file.
+- Every e2e spec has a 3-6 line JSDoc header after the imports, before the first `test()` or `describe()`, saying what it exercises and asserts. For unit tests it is optional.
 
 ## Checking a change in a browser
 
-The extension is checked in a real Chromium with `build/` loaded, never `dev/chrome` (that is the human's `pnpm dev:browser` profile).
+The extension is checked in a real Chromium with `build/` loaded, never `dev/chrome` (the human's `pnpm dev:browser` profile).
 
-- Start with the `verifying-changes` skill. It sets the bar: a spec that failed without the change and passes with it. `browser-verify` is for exploring (selectors, console, network) and `e2e-spec` is for writing the spec.
-- `cd packages/danmaku-anywhere && pnpm run verify:explore` rebuilds `build/` when it is stale (`VITE_DA_ENV=e2e`) and prints the commands to drive it. If Chromium is missing, install it with `pnpm exec playwright install chromium` in that package.
-- Specs refuse to run against a stale `build/`. After changing product code, run `VITE_DA_ENV=e2e pnpm run build` before `pnpm exec playwright test <spec>`.
-- Reload a rebuilt extension in a running browser with CDP `Extensions.loadUnpacked`, as `e2e/setup/swapExtension.ts` does. `chrome.runtime.reload()` does not bring the extension back under `--load-extension`.
-- Playwright empties `packages/danmaku-anywhere/test-results` on every run. Copy screenshots and recordings out before the next run.
-- To exercise a published nightly or branch preview build instead of a local one, use the `preview-build` skill.
+- Start with the `verifying-changes` skill; `browser-verify` explores, `e2e-spec` writes the spec, `preview-build` exercises a published build.
+- `cd packages/danmaku-anywhere && pnpm run verify:explore` rebuilds a stale `build/` and prints how to drive it.
+- Reload a rebuilt extension in a running browser with CDP `Extensions.loadUnpacked` (see `e2e/setup/swapExtension.ts`); `chrome.runtime.reload()` does not bring it back under `--load-extension`.
 
 ## Before opening a pull request
 
-1. `pnpm lint`. It runs `tsc`, Biome with autofix, and `lint:specs`, which fails locally on `as unknown as` doubles in unit tests, tests that only assert `toHaveBeenCalled*`, and `vi.mock` of modules nobody imports. In CI it only annotates.
-2. `pnpm --filter '...[origin/master]' test` for the packages you touched.
-3. Changed translation keys: `cd packages/danmaku-anywhere && pnpm i18n extract`, translate new `zh` entries, commit the JSON. CI fails the i18n check otherwise.
+1. `pnpm lint`. It also runs `lint:specs`, which fails locally on `as unknown as` in unit tests, tests that only assert `toHaveBeenCalled*`, and `vi.mock` of modules nobody imports.
+2. `pnpm --filter '...[origin/master]' test`. CI runs the extension tests with `DA_DOCS_DIR` pointing at a `Danmaku-Anywhere/docs` checkout; locally, set it to any docs checkout or the `docsPaths` test skips (it throws when `CI` is set and the variable is missing).
+3. Changed translation keys: run `pnpm i18n extract`, translate new `zh` entries, commit the JSON.
 4. Runtime behaviour in the extension: the spec from `verifying-changes` (red before green), plus the affected e2e specs by path.
-5. `pnpm -s fallow audit --base origin/master --skip health`, the same dead-code audit CI runs. Fix valid findings, and read the job log and PR comment in CI, because the check can pass while still reporting warnings.
-6. Title the PR `(type) description [DA-XXX]` with type one of `extension`, `app`, `proxy`, `chore`, `docs`; CI checks the format. The title check also fails when the branch name carries a different DA id than the title, so put the same id in the branch name. When the ClickUp token is set in CI, it also fails when the type in the title differs from the task's Type field in ClickUp.
-7. A change a user can see gets before and after screenshots in the PR body, and a short clip when it involves motion or a sequence of steps. Capture and hosting steps are in the PR step of `.claude/commands/da-dev.md`.
-8. CI runs the extension's tests against a checkout of `Danmaku-Anywhere/docs` (`DA_DOCS_DIR`, read by `docsPaths.test.ts`). Locally that test is skipped unless you clone the docs repo and run `DA_DOCS_DIR=/path/to/docs pnpm --filter @mr-quin/danmaku-anywhere test`.
+5. `pnpm -s fallow audit --base origin/master --skip health`, the audit CI runs. Read the CI log and PR comment too: the check can pass with warnings.
+6. Title `(type) description [DA-XXX]`, type one of `extension`, `app`, `proxy`, `chore`, `docs`. The branch name must carry the same DA id. When `CLICKUP_API_TOKEN` and `CLICKUP_TEAM_ID` are both set, CI also compares the type with the task's Type field in ClickUp. `changeset-release/` branches skip all title checks.
+7. A change a user can see gets before and after screenshots in the PR body, and a short clip when it involves motion. Capture steps are in `.claude/commands/da-dev.md`.
 
 Fix failing CI checks on your PR without waiting to be asked.
 
-## Pre-commit hooks
+## Pitfalls
 
-Lefthook runs Biome check on staged files before each commit (auto-fixes formatting). If a commit fails, check the Biome output.
-
-## Common pitfalls
-
-- Always run `pnpm build:packages` before running the extension in dev mode, since it imports from workspace packages
-- The extension uses `@crxjs/vite-plugin` which has its own HMR behavior — don't confuse with standard Vite
-- `pnpm-lock.yaml` is in `.cursorignore` — don't try to read it
-- The package manager is pinned by `packageManager` in the root `package.json` — do not use npm or yarn
-- Danmaku Builds (the release manager) lives in `Danmaku-Anywhere/release-manager` now. Never delete the `release-manager-latest` release or its tag here: copies older than 0.5.0 still update through it.
-- The documentation site lives in `Danmaku-Anywhere/docs` now. Its changelog page is regenerated daily from this repo's published releases, so release notes are the place to fix changelog text.
+- Danmaku Builds (the release manager) lives in `Danmaku-Anywhere/release-manager`. Never delete the `release-manager-latest` release or its tag here: copies older than 0.5.0 still update through it.
+- The documentation site lives in `Danmaku-Anywhere/docs`. Its changelog page is regenerated daily from this repo's published releases, so fix changelog text in the release notes.
