@@ -11,7 +11,7 @@ description: Use to open a fresh Claude session in a new terminal tab for a da-d
 claude --model <model> --permission-mode acceptEdits --add-dir . -- "Read <task_file> and follow the instructions"
 ```
 
-`<model>` is the implementation model for the dispatched session: a strong coding model chosen to fit the task, scaled down for mechanical or low-risk changes. It need not be the top research-tier model used for planning and spec writing. Pick from the aliases `claude --help` lists, following the model-selection guidance in `CLAUDE.md`.
+`<model>` is the implementation model for the dispatched session: a strong coding model chosen to fit the task, scaled down for mechanical or low-risk changes. It need not be the top research-tier model used for planning and spec writing. Pick from the aliases `claude --help` lists.
 
 How you open the tab depends on the terminal you're in (`$TERM_PROGRAM`). Substitute `<model>`, `<worktree>`, `<task_file>`, `<title>`, and the task id (`DA-XXX`) from the `READY` block throughout.
 

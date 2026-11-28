@@ -35,6 +35,7 @@ test-results/
 playwright-report/
 .tmp/
 .claude-verify/
+.claude-task.md
 
 # playwright agent CLI scratch output (written into whatever cwd it runs from)
 .playwright-cli
