@@ -32,9 +32,9 @@ const ASSET_GROUPS: readonly AssetGroup[] = [
         'wasm'
       ),
     destDir: 'mediapipe/wasm',
-    // The build targets (chrome89+/firefox89+) all support SIMD, so
-    // FilesetResolver always picks the SIMD build; the no-SIMD fallback is dead
-    // weight.
+    // The package also ships a vision_wasm_module_internal pair, which
+    // FilesetResolver.forVisionTasks loads only when passed useModule.
+    // segmenterFrame does not pass it.
     files: ['vision_wasm_internal.js', 'vision_wasm_internal.wasm'],
   },
   {
